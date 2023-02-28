@@ -39,7 +39,7 @@ export default function Game(props) {
   let camera, scene, renderer, controls;
   const objects = [];
   let raycaster;
-
+  let player;
   let moveForward = false;
   let moveBackward = false;
   let moveLeft = false;
@@ -228,6 +228,45 @@ export default function Game(props) {
     }
   }
 
+  const loadPlayer = async () => {
+    const content = JSON.parse(ref.current.profile.content);
+    const geometry = new THREE.BoxGeometry(14, 14, 14, 1, 1, 1);
+
+    let imgTexture = new THREE.TextureLoader().load(makeBlockie(ref.current.profile.pubkey));
+    try{
+      imgTexture = new THREE.TextureLoader().load(content.picture.replace("ipfs://", "https://nftstorage.link/ipfs/"));
+    } catch(err){
+      console.log(err)
+    }
+    const gameInfo = new THREE.Group()
+    const material = new THREE.MeshBasicMaterial({ map: imgTexture,transparent:true, opacity: 1 });
+
+    const materialSprite = new THREE.SpriteMaterial({ map: imgTexture });
+    const sprite = new THREE.Sprite(materialSprite);
+    sprite.scale.set(10, 10, 10)
+    const name = new SpriteText(content.display_name ? content.display_name : content.name ? content.name : state.profile.pubkey , 5, "red");
+    const description = new SpriteText(content.about, 3, "blue")
+    const external_url = new SpriteText(content.website, 1, "green");
+    name.position.y = 40;
+    description.position.y = 25;
+    external_url.position.y = 20
+    sprite.position.y = 5;
+    gameInfo.add(sprite)
+    gameInfo.add(name)
+    gameInfo.add(description)
+    gameInfo.add(external_url)
+    const vector = camera.position.clone();
+    const x = vector.x;
+    const z = vector.z;
+    gameInfo.position.set(x, 5 , z);
+    console.log(gameInfo.position)
+    gameInfo.scale.set(0.5,0.5,0.5)
+    gameInfo.name = content.display_name ? content.display_name : content.name ? content.name : state.profile.pubkey;
+    gameInfo.uri = content.website;
+    scene.add(gameInfo);
+    player = gameInfo;
+  }
+
   const checkUris = async () => {
     ref.current = {
       ...ref.current,
@@ -401,15 +440,20 @@ export default function Game(props) {
       await delay(2000)
       checkUris();
     }
+    if(!player && ref.current?.profile){
+      loadPlayer();
+    }
+
+    const dist = 40;
+    const cwd = new THREE.Vector3();
+    camera.getWorldDirection(cwd);
+    cwd.multiplyScalar(dist);
+    cwd.add(camera.position);
+    if(player){
+      player.position.set(cwd.x, cwd.y+2, cwd.z);
+    }
     if(gameText){
-      const dist = 50;
-      const cwd = new THREE.Vector3();
-      camera.getWorldDirection(cwd);
-
-      cwd.multiplyScalar(dist);
-      cwd.add(camera.position);
-
-      gameText.position.set(cwd.x, cwd.y+2, cwd.z);
+      gameText.position.set(cwd.x, cwd.y+4, cwd.z);
     }
     requestAnimationFrame(animate);
     const time = performance.now();
