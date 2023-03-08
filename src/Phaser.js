@@ -60,6 +60,7 @@ class MainScene extends Scene3D {
     })
     this.playerProfile = newProfile;
     console.log(newProfile)
+    alert(newProfile.content)
     if(this.player){
       this.third.destroy(this.player);
       await this.generatePlayer()
@@ -81,47 +82,7 @@ class MainScene extends Scene3D {
 
     // this.third.physics.debug.enable()
 
-    /**
-     * Medieval Fantasy Book by Pixel (https://sketchfab.com/stefan.lengyel1)
-     * https://sketchfab.com/3d-models/medieval-fantasy-book-06d5a80a04fc4c5ab552759e9a97d91a
-     * Attribution 4.0 International (CC BY 4.0)
-     */
-    this.third.load.gltf('/assets/gltf/scene.gltf').then(object => {
-      const scene = object.scenes[0]
-
-      const book = new ExtendedObject3D()
-      book.name = 'scene'
-      book.add(scene)
-      this.third.add.existing(book)
-
-      // add animations
-      // sadly only the flags animations works
-      object.animations.forEach((anim, i) => {
-        book.mixer = this.third.animationMixers.create(book)
-        // overwrite the action to be an array of actions
-        book.action = []
-        book.action[i] = book.mixer.clipAction(anim)
-        book.action[i].play()
-      })
-
-      book.traverse(child => {
-        if (child.isMesh) {
-          child.castShadow = child.receiveShadow = false
-          child.material.metalness = 0
-          child.material.roughness = 1
-          this.third.physics.add.existing(child, {
-            shape: 'concave',
-            mass: 0,
-            collisionFlags: 1,
-            autoCenter: false
-          })
-          child.body.setAngularFactor(0, 0, 0)
-          child.body.setLinearFactor(0, 0, 0)
-        }
-      })
-    })
-
-
+    await this.generateScenario();
 
 
     await this.generatePlayer();
@@ -150,6 +111,7 @@ class MainScene extends Scene3D {
       s: this.input.keyboard.addKey('s'),
       e: this.input.keyboard.addKey('e'),
       c: this.input.keyboard.addKey('c'),
+      k: this.input.keyboard.addKey('k'),
       space: this.input.keyboard.addKey(32)
     }
 
@@ -202,6 +164,50 @@ class MainScene extends Scene3D {
       }
     }
   }
+
+  generateScenario(){
+    /**
+     * Medieval Fantasy Book by Pixel (https://sketchfab.com/stefan.lengyel1)
+     * https://sketchfab.com/3d-models/medieval-fantasy-book-06d5a80a04fc4c5ab552759e9a97d91a
+     * Attribution 4.0 International (CC BY 4.0)
+     */
+    this.third.load.gltf('/assets/gltf/scene.gltf').then(object => {
+      const scene = object.scenes[0]
+
+      const book = new ExtendedObject3D()
+      book.name = 'scene'
+      book.add(scene)
+      this.third.add.existing(book)
+
+      // add animations
+      // sadly only the flags animations works
+      object.animations.forEach((anim, i) => {
+        book.mixer = this.third.animationMixers.create(book)
+        // overwrite the action to be an array of actions
+        book.action = []
+        book.action[i] = book.mixer.clipAction(anim)
+        book.action[i].play()
+      })
+
+      book.traverse(child => {
+        if (child.isMesh) {
+          child.castShadow = child.receiveShadow = false
+          child.material.metalness = 0
+          child.material.roughness = 1
+          this.third.physics.add.existing(child, {
+            shape: 'concave',
+            mass: 0,
+            collisionFlags: 1,
+            autoCenter: false
+          })
+          child.body.setAngularFactor(0, 0, 0)
+          child.body.setLinearFactor(0, 0, 0)
+        }
+      })
+    })
+
+
+  }
   async generatePlayer(){
     /**
       * Create Player
@@ -210,7 +216,7 @@ class MainScene extends Scene3D {
     let playerName = "Guest "+getRandomInt(10000);
     let content;
     if(this.playerProfile){
-      content = JSON.parse(this.playerProfile.profile.content);
+      content = JSON.parse(this.playerProfile.content);
       playerName = content.name ? content.name : content.display_name ? content.display_name : this.playerProfile.profile.pubkey
     }
     let texture = new FLAT.TextTexture(playerName);
@@ -223,7 +229,11 @@ class MainScene extends Scene3D {
     if(!this.playerProfile){
       playerImg = await this.third.load.texture("https://ipfs.io/ipfs/QmeVRmVLPqUNZUKERq14uXPYbyRoUN7UE8Sha2Q4rT6oyF");
     } else {
-      playerImg = content.picture ? content.picture : makeBlockie(this.playerProfile.profile.pubkey)
+      const loader = new THREE.TextureLoader();
+
+      loader.setCrossOrigin('anonymous')
+      playerImg = content.picture ? await loader.load(content.picture) :
+                  await this.third.load.texture(makeBlockie(this.playerProfile.profile.pubkey))
     }
     const material = new THREE.SpriteMaterial( { map: playerImg } );
     const sprite = new THREE.Sprite( material );
@@ -281,7 +291,7 @@ class MainScene extends Scene3D {
       sprite3d.position.y = 1.2;
       sprite3d.setScale(0.0025);
       let image;
-      var loader = new THREE.TextureLoader();
+      const loader = new THREE.TextureLoader();
 
       loader.setCrossOrigin('anonymous')
       try{
@@ -325,6 +335,20 @@ class MainScene extends Scene3D {
     } catch(err){
       console.log(err)
     }
+  }
+
+  async keysend(){
+    if(!window.webln) return;
+    await window.webln.enable();
+    const result = await window.webln.keysend({
+        destination: "03c9e422da6b3c9a29d65f2c91ff73c36c93d645ce91e125a7a20e1758b42cc309",
+        amount: "10",
+        customRecords: {
+            "message": "Nostr Space Donation!"
+        }
+    });
+    this.keysending = false;
+
   }
 
   jump() {
@@ -391,7 +415,15 @@ class MainScene extends Scene3D {
       if(window.nostr && !window.nostr?.enabled && this.keys.c.isDown && !this.connecting){
         this.connecting = true;
         this.connect();
-
+      }
+      if(window.webln && this.keys.k.isDown && !this.keysending){
+        this.keysending = true;
+        this.keysend();
+      }
+      if(this.player.position.y < - 10){
+        this.third.physics.destroy(this.player)
+        this.player.position.set(getRandomInt(10)- getRandomInt(20), 10, getRandomInt(10) - getRandomInt(20));
+        this.third.physics.add.existing(this.player);
       }
     }
   }
