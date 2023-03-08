@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three';
 import {
-  SimplePool
+  SimplePool,
+  nip19
 } from 'nostr-tools'
 import makeBlockie from 'ethereum-blockies-base64';
 import { relays } from './utils';
 import SpriteText from 'three-spritetext';
+import * as CANNON from 'cannon-es'
 
 
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls'
@@ -38,6 +40,7 @@ export default function Game(props) {
 
   let camera, scene, renderer, controls;
   const objects = [];
+  const maxBodies = 150;
   let raycaster;
   let player;
   let moveForward = false;
@@ -45,6 +48,8 @@ export default function Game(props) {
   let moveLeft = false;
   let moveRight = false;
   let canJump = false;
+  let publickeys = [];
+  let world;
 
   let prevTime = performance.now();
   const velocity = new THREE.Vector3();
@@ -54,8 +59,8 @@ export default function Game(props) {
   const infos = [];
   let collision = false;
   let gameText;
-
-
+  let bodies = [];
+  let playerBody;
   const occupySpace = async () => {
     camera.updateMatrixWorld();
     const vector = camera.position.clone();
@@ -97,15 +102,16 @@ export default function Game(props) {
         break;
 
       case 'KeyU':
-        const vector = camera.position.clone();
+        const vector = player ? player.position.clone() : camera.position.clone();
         const x = (vector.x).toFixed(0);
         const z = (vector.z).toFixed(0);
         console.log(infos[`${x}_${z}`])
+        console.log(`Player pos (${x},${z})`)
         const info = infos[`${x}_${z}`]
         if(info.pubkey){
-          let yes = window.confirm(`Open https://iris.to/${info.pubkey} in a new tab?` );
+          let yes = window.confirm(`Open https://iris.to/${nip19.npubEncode(info.pubkey)} in a new tab?` );
           if(yes) {
-            window.open(`https://iris.to/${info.pubkey}`,"_blank")
+            window.open(`https://iris.to/${nip19.npubEncode(info.pubkey)}`,"_blank")
           }
         }
         break;
@@ -166,8 +172,10 @@ export default function Game(props) {
 
   const addInfo = async (info) => {
     const content = JSON.parse(info.profile.content);
+    if(publickeys[content.name ? content.name : content.display_name ? content.display_name : info.profile.pubkey]) return;
+    publickeys[content.name] = true;
     let metadata;
-    if(!content.name){
+    if(!content.name && !content.display_name){
       return;
     }
     console.log(`${content.display_name ? content.display_name : content.name} at ${info.x},${info.z}`)
@@ -177,7 +185,7 @@ export default function Game(props) {
     console.log(info)
     try{
       metadata = {
-        name: content.display_name ? content.display_name : content.name ? content.name : info.pubkey,
+        name: content.display_name ? content.display_name : content.name ? content.name : info.profile.pubkey,
         description: content.about,
         image: content.picture ?
           content.picture :
@@ -193,6 +201,14 @@ export default function Game(props) {
       } catch(err){
         console.log(err)
       }
+      const boxBody = new CANNON.Body({
+        mass: 5, // kg
+        shape: new CANNON.Box(new CANNON.Vec3(1,1,1))
+      })
+
+      boxBody.position.set(info.x, 15 , info.z);
+      boxBody.quaternion.set(0, 0, 0, 1);
+      world.addBody(boxBody);
 
       const material = new THREE.MeshBasicMaterial({ map: imgTexture,transparent:true, opacity: 1 });
       const cube = new THREE.Mesh(geometry,material);
@@ -213,15 +229,19 @@ export default function Game(props) {
       gameInfo.add(name)
       gameInfo.add(description)
       gameInfo.add(external_url)
-      gameInfo.position.set(info.x, 5 , info.z)
-      console.log(gameInfo.position)
+      //gameInfo.position.set(info.x, 5 , info.z)
       gameInfo.scale.set(0.5,0.5,0.5)
       gameInfo.name = metadata.name;
       gameInfo.uri = metadata.external_url?.replace("ipfs://","https://ipfs.io/ipfs/");
+      gameInfo.position.copy(boxBody.position);
+      gameInfo.quaternion.copy(boxBody.quaternion);
+
       scene.add(gameInfo);
-      infos[`${info.x}_${info.z}`] = gameInfo;
-
-
+      infos[`${info.x}_${info.z}`] = info;
+      bodies.push({
+        mesh: gameInfo,
+        body: boxBody
+      })
 
     } catch(err){
       console.log(err)
@@ -258,13 +278,27 @@ export default function Game(props) {
     const vector = camera.position.clone();
     const x = vector.x;
     const z = vector.z;
-    gameInfo.position.set(x, 5 , z);
+    const boxBody = new CANNON.Body({
+      mass: 5, // kg
+      shape: new CANNON.Box(new CANNON.Vec3(1,1,1))
+    })
+
+    boxBody.position.set(x, 15 , z);
+    boxBody.quaternion.set(0, 0, 0, 1);
+    world.addBody(boxBody);
+    gameInfo.position.copy(boxBody.position);
+    gameInfo.quaternion.copy(boxBody.quaternion);
+    //gameInfo.position.set(x, 5 , z);
     console.log(gameInfo.position)
     gameInfo.scale.set(0.5,0.5,0.5)
     gameInfo.name = content.display_name ? content.display_name : content.name ? content.name : state.profile.pubkey;
     gameInfo.uri = content.website;
     scene.add(gameInfo);
     player = gameInfo;
+    playerBody = boxBody;
+    //controls = new PointerLockControls(player, document.body);
+
+
   }
 
   const checkUris = async () => {
@@ -276,6 +310,7 @@ export default function Game(props) {
     console.log(events)
 
     for(let i = 0; i < events.length; i++){
+      if(bodies.length > maxBodies) break;
       let info = {
         x: getRandomInt(2000),
         z: getRandomInt(2000),
@@ -291,20 +326,25 @@ export default function Game(props) {
     // floor
 
     let floorGeometry = new THREE.PlaneGeometry(2000, 2000, 100, 100);
-    floorGeometry.rotateX(- Math.PI / 2);
+    //floorGeometry.rotateX(- Math.PI / 2);
 
     // vertex displacement
 
     let position = floorGeometry.attributes.position;
+    const dataY = [];
+    for(var i = 0; i < 1000; i++){
+    var y = 0.5 * Math.cos(0.2 * i);
+    dataY.push(y);
+}
 
     for (let i = 0, l = position.count; i < l; i++) {
 
       vertex.fromBufferAttribute(position, i);
 
       vertex.x += Math.random() * 20 - 10;
-      vertex.y += Math.random() * 2;
+      vertex.y += Math.random() * 20 - 10;
       vertex.z += Math.random() * 20 - 10;
-
+      //dataY.push(vertex.y);
       position.setXYZ(i, vertex.x, vertex.y, vertex.z);
 
     }
@@ -326,19 +366,40 @@ export default function Game(props) {
     const floorMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
 
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.position.set(1000,0,1000)
+    //floor.position.set(1000,0,1000)
+    // ground body
+    const groundBody = new CANNON.Body({
+      type: CANNON.Body.STATIC,
+      shape: new CANNON.Plane()
+    });
+    // Create the heightfield shape
+    var heightfieldShape = new CANNON.Heightfield(dataY, {
+        elementSize: 1 // Distance between the data points in X and Y directions
+    });
+    var heightfieldBody = new CANNON.Body();
+    heightfieldBody.addShape(heightfieldShape);
+    world.addBody(heightfieldBody);
+    groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0) // make it face up
+    groundBody.position.set(1000,0,1000)
+    world.addBody(groundBody);
+    floor.position.copy(groundBody.position);
+    floor.quaternion.copy(groundBody.quaternion);
+    //floor.rotateX( - Math.PI / 2);
 
     scene.add(floor);
   }
 
-  async function init() {
+  const init = async () => {
 
     ref.current = {
       ...ref.current,
       lock: false
     }
+    world = new CANNON.World({gravity: new CANNON.Vec3(0,-9.82, 0)});
+
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
-    camera.position.set(1000,1,1000)
+    camera.position.set(1000,1,1000);
+
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
     scene.fog = new THREE.Fog(0xffffff, 0, 750);
@@ -385,7 +446,6 @@ export default function Game(props) {
     document.addEventListener('keyup', onKeyUp);
 
     raycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, - 1, 0), 0, 10);
-
     generateFloor();
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -404,8 +464,9 @@ export default function Game(props) {
     )
 
     sub.on('event', async event => {
-      console.log('we got the event we wanted:', event)
+      //console.log('we got the event we wanted:', event)
       if(event.content){
+        if(bodies.length > maxBodies) return;
         const name = JSON.parse(event.content).display_name;
         if(name){
           let info = {
@@ -424,7 +485,24 @@ export default function Game(props) {
     window.addEventListener('resize', onWindowResize);
 
   }
-
+  const initPhysics = () => {
+    world = new CANNON.World({
+      gravity: new CANNON.Vec3(0, -9.82, 0), // m/s²
+    });
+    const radius = 1 // m
+    const sphereBody = new CANNON.Body({
+      mass: 5, // kg
+      shape: new CANNON.Sphere(radius),
+    })
+    sphereBody.position.set(0, 10, 0) // m
+    world.addBody(sphereBody);
+    const groundBody = new CANNON.Body({
+      type: CANNON.Body.STATIC,
+      shape: new CANNON.Plane(),
+    })
+    groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0) // make it face up
+    world.addBody(groundBody)
+  }
   function onWindowResize() {
 
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -436,12 +514,19 @@ export default function Game(props) {
 
   async function animate() {
     const contractInitiated = ref.current?.contractInitiated;
+    world.fixedStep();
+
     if (!contractInitiated) {
       await delay(2000)
       checkUris();
     }
     if(!player && ref.current?.profile){
       loadPlayer();
+    }
+    if(player){
+      player.position.copy(playerBody.position);
+      player.quaternion.copy(playerBody.quaternion);
+      camera.lookAt(player.position);
     }
 
     const dist = 40;
@@ -456,6 +541,12 @@ export default function Game(props) {
       gameText.position.set(cwd.x, cwd.y+4, cwd.z);
     }
     requestAnimationFrame(animate);
+    // Run the simulation independently of framerate every 1 / 60 ms
+    world.fixedStep();
+    bodies.map(obj => {
+      obj.mesh.position.copy(obj.body.position)
+      obj.mesh.quaternion.copy(obj.body.quaternion)
+    })
     const time = performance.now();
     if (controls.isLocked === true) {
 
