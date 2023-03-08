@@ -65,6 +65,7 @@ class MainScene extends Scene3D {
       await this.generatePlayer()
     }
     this.connecting = false;
+    this.connected = true;
 
   }
 
@@ -386,7 +387,7 @@ class MainScene extends Scene3D {
         this.jump()
       }
 
-      if(window.nostr && !window.nostr?.enabled && this.keys.c.isDown && !this.connecting){
+      if(window.nostr && this.keys.c.isDown && !this.connecting && !this.connected){
         this.connecting = true;
         this.connect();
       }
