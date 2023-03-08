@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import chroma from "chroma-js";
 
 import {
   enable3d,
@@ -59,8 +60,6 @@ class MainScene extends Scene3D {
       kinds: [0]
     })
     this.playerProfile = newProfile;
-    console.log(newProfile)
-    alert(newProfile.content)
     if(this.player){
       this.third.destroy(this.player);
       await this.generatePlayer()
@@ -165,47 +164,22 @@ class MainScene extends Scene3D {
     }
   }
 
-  generateScenario(){
-    /**
-     * Medieval Fantasy Book by Pixel (https://sketchfab.com/stefan.lengyel1)
-     * https://sketchfab.com/3d-models/medieval-fantasy-book-06d5a80a04fc4c5ab552759e9a97d91a
-     * Attribution 4.0 International (CC BY 4.0)
-     */
-    this.third.load.gltf('/assets/gltf/scene.gltf').then(object => {
-      const scene = object.scenes[0]
+  async generateScenario(){
 
-      const book = new ExtendedObject3D()
-      book.name = 'scene'
-      book.add(scene)
-      this.third.add.existing(book)
+      // heightmap from https://medium.com/@travall/procedural-2d-island-generation-noise-functions-13976bddeaf9
+     const heightmap = await this.third.load.texture('/assets/heightmap/heightmap-island.png')
 
-      // add animations
-      // sadly only the flags animations works
-      object.animations.forEach((anim, i) => {
-        book.mixer = this.third.animationMixers.create(book)
-        // overwrite the action to be an array of actions
-        book.action = []
-        book.action[i] = book.mixer.clipAction(anim)
-        book.action[i].play()
-      })
+     // Powered by Chroma.js (https://github.com/gka/chroma.js/)
+     const colorScale = chroma
+       .scale(['#003eb2', '#0952c6', '#a49463', '#867645', '#3c6114', '#5a7f32', '#8c8e7b', '#a0a28f'])
+       .domain([0, 0.025, 0.1, 0.2, 0.25, 0.8, 1.3, 1.45, 1.6])
 
-      book.traverse(child => {
-        if (child.isMesh) {
-          child.castShadow = child.receiveShadow = false
-          child.material.metalness = 0
-          child.material.roughness = 1
-          this.third.physics.add.existing(child, {
-            shape: 'concave',
-            mass: 0,
-            collisionFlags: 1,
-            autoCenter: false
-          })
-          child.body.setAngularFactor(0, 0, 0)
-          child.body.setLinearFactor(0, 0, 0)
-        }
-      })
-    })
-
+     const mesh = this.third.heightMap.add(heightmap, { colorScale })
+     if (mesh) {
+       // we position, scale, rotate etc. the mesh before adding physics to it
+       mesh.scale.set(5, 5, 1)
+       this.third.physics.add.existing(mesh, { mass: 0 })
+     }
 
   }
   async generatePlayer(){
