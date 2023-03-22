@@ -78,7 +78,6 @@ class MainScene extends Scene3D {
     ambientLight.intensity = intensity
     directionalLight.intensity = intensity
 
-    this.third.physics.add.box({ y: 10, x: 35 }, { lambert: { color: 'red' } })
 
     // this.third.physics.debug.enable()
 
@@ -145,20 +144,32 @@ class MainScene extends Scene3D {
     }
 
     // Add nostr profiles to populate
-    let events = await pool.list(relays, [{kinds: [0]}])
-
-    for(let i = 0; i < events.length; i++){
+    let events = await pool.list(relays, [
+      {
+        ids: ['2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c']
+      }
+    ])
+    console.log(events)
+    const pubkeys = [... new Set(events.map(item => item.pubkey))];
+    console.log(pubkeys)
+    const profiles = await pool.list(relays, [{
+      authors: pubkeys,
+      kinds: [0]
+    }]);
+    console.log(profiles)
+    for(let i = 0; i < profiles.length; i++){
       try{
         if(this.profiles.length >= this.maxProfiles){
           break
         }
         let info = {
-          x: getRandomInt(30) - getRandomInt(30),
-          z: getRandomInt(30) - getRandomInt(30),
-          profile: events[i]
+          x: getRandomInt(30)-getRandomInt(30),
+          z: getRandomInt(30)-getRandomInt(30),
+          profile: profiles[i]
         }
+        console.log(info)
         await this.addProfile(info);
-        await delay(2000)
+        await delay(1000)
       } catch(err){
         console.log(err)
       }
@@ -246,8 +257,6 @@ class MainScene extends Scene3D {
     if(!content.name && !content.display_name){
       return;
     }
-    console.log(`${content.display_name ? content.display_name : content.name} at ${info.x},${info.z}`)
-    console.log(info)
     try{
       metadata = {
         name: content.display_name ? content.display_name : content.name ? content.name : info.profile.pubkey,
@@ -294,7 +303,12 @@ class MainScene extends Scene3D {
         sprite3d.setScale(0.001);
         body.add(sprite3d);
       }
-      body.position.set(info.x,20,info.z)
+      if(content['nostr-space-pos']){
+        console.log(content['nostr-space-pos'])
+        body.position.set(JSON.parse(content['nostr-space-pos']).x,20,JSON.parse(content['nostr-space-pos']).z)
+      } else {
+        body.position.set(info.x,20,info.z)
+      }
       this.third.physics.add.existing(body);
       this.third.add.existing(body)
       this.third.physics.add.collider(body, this.player, async event => {
