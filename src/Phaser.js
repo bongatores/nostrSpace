@@ -156,7 +156,6 @@ class MainScene extends Scene3D {
       }
     ])
     const pubkeys = [... new Set(events.map(item => item.pubkey))];
-    console.log(pubkeys)
     const threadProfiles = await pool.list(relays,[{
       kinds: [0],
       authors: pubkeys
@@ -295,7 +294,7 @@ class MainScene extends Scene3D {
       const textureCube = this.third.misc.textureCube([image,image,image,image,image,image])
       const body = this.third.add.box({
         width: 0.5,
-        height: 0.5,
+        height: 0.3,
         depth: 0.5
       }, {
         custom: textureCube.materials
