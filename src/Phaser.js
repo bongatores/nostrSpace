@@ -144,16 +144,24 @@ class MainScene extends Scene3D {
     }
 
     // Add nostr profiles to populate
+    let threads = window.location.href.split("?threads=")[1];
+    /*
+    if(!threads){
+      threads = [
+        "2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c"
+      ];
+    }
     let events = await pool.list(relays, [
       {
-        ids: ['2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c']
+        tags: [[ "e", "2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c","","reply"]],
+        kinds: [1]
       }
     ])
     console.log(events)
     const pubkeys = [... new Set(events.map(item => item.pubkey))];
     console.log(pubkeys)
+    */
     const profiles = await pool.list(relays, [{
-      authors: pubkeys,
       kinds: [0]
     }]);
     console.log(profiles)
@@ -286,11 +294,10 @@ class MainScene extends Scene3D {
       const textureCube = this.third.misc.textureCube([image,image,image,image,image,image])
       const body = this.third.add.box({
         width: 0.5,
-        height: 0.3,
+        height: 0.5,
         depth: 0.5
       }, {
-        custom: textureCube.materials,
-        mass: 10000
+        custom: textureCube.materials
       });
       body.add(sprite3d);
       if(metadata.description){
@@ -309,6 +316,7 @@ class MainScene extends Scene3D {
       } else {
         body.position.set(info.x,20,info.z)
       }
+
       this.third.physics.add.existing(body);
       this.third.add.existing(body)
       this.third.physics.add.collider(body, this.player, async event => {
