@@ -144,26 +144,27 @@ class MainScene extends Scene3D {
     }
 
     // Add nostr profiles to populate
-    let threads = window.location.href.split("?threads=")[1];
-    /*
-    if(!threads){
-      threads = [
-        "2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c"
-      ];
+    let thread = window.location.href.split("?thread=")[1];
+
+    if(!thread){
+      thread = "2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c";
     }
     let events = await pool.list(relays, [
       {
-        tags: [[ "e", "2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c","","reply"]],
+        '#e': [thread],
         kinds: [1]
       }
     ])
-    console.log(events)
     const pubkeys = [... new Set(events.map(item => item.pubkey))];
     console.log(pubkeys)
-    */
-    const profiles = await pool.list(relays, [{
+    const threadProfiles = await pool.list(relays,[{
+      kinds: [0],
+      authors: pubkeys
+    }])
+    let profiles = await pool.list(relays, [{
       kinds: [0]
     }]);
+    profiles = [...threadProfiles,...profiles];
     console.log(profiles)
     for(let i = 0; i < profiles.length; i++){
       try{
