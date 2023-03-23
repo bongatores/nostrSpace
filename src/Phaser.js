@@ -156,14 +156,12 @@ class MainScene extends Scene3D {
       }
     ])
     const pubkeys = [... new Set(events.map(item => item.pubkey))];
-    const threadProfiles = await pool.list(relays,[{
+    const profiles = await pool.list(relays,[{
       kinds: [0],
       authors: pubkeys
-    }])
-    let profiles = await pool.list(relays, [{
+    },{
       kinds: [0]
-    }]);
-    profiles = [...threadProfiles,...profiles];
+    }])
     console.log(profiles)
     for(let i = 0; i < profiles.length; i++){
       try{
@@ -299,7 +297,12 @@ class MainScene extends Scene3D {
       }, {
         custom: textureCube.materials
       });
+      const material = new THREE.SpriteMaterial( { map: image } );
+      const sprite = new THREE.Sprite( material );
+      sprite.position.y = 0.4
+      sprite.scale.set(0.5,0.5,0.5)
       body.add(sprite3d);
+      body.add(sprite);
       if(metadata.description){
         text = `${metadata.description}`;
         texture = new FLAT.TextTexture(`${text}`);
