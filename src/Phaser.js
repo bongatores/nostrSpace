@@ -1,3 +1,4 @@
+import {useEffect} from  'react';
 import Phaser from 'phaser';
 import chroma from "chroma-js";
 
@@ -13,6 +14,11 @@ import {
   PointerDrag,
   Canvas,
 } from '@enable3d/phaser-extension';
+import {
+  Box,
+  Text,
+ } from 'grommet';
+
 import makeBlockie from 'ethereum-blockies-base64';
 
 import { getAddressInfo, connectWallet,relays } from './utils';
@@ -111,6 +117,7 @@ class MainScene extends Scene3D {
       e: this.input.keyboard.addKey('e'),
       c: this.input.keyboard.addKey('c'),
       k: this.input.keyboard.addKey('k'),
+      i: this.input.keyboard.addKey('i'),
       space: this.input.keyboard.addKey(32)
     }
 
@@ -442,12 +449,56 @@ const config = {
   ...Canvas({ antialias: false })
 }
 
+
+
 let init = false;
 const Game3D =  () => {
-  if(!init){
-    enable3d(() => new Phaser.Game(config)).withPhysics('/lib/ammo');
-    init = true;
-  }
-  return null
+
+
+  const keyDownHandler = event => {
+      console.log('User pressed: ', event.key);
+
+      if (event.key === 'i') {
+        event.preventDefault();
+
+        const instructions = document.getElementById("instructions");
+        console.log(instructions.style.display)
+        if(instructions.style.display === "none"){
+          instructions.style.display = "flex"
+        } else {
+          instructions.style.display = "none"
+        }
+      }
+  };
+  useEffect(() => {
+    document.addEventListener('keydown', keyDownHandler);
+  },[]);
+  useEffect(() => {
+    if(!init){
+      enable3d(() => new Phaser.Game(config)).withPhysics('/lib/ammo');
+      init = true;
+    }
+  },[])
+
+  return(
+    <Box
+      style={{
+        position: "absolute",
+        zIndex: 100,
+        border: "2px solid black"
+      }}
+      background="blue"
+      alignContent="justify"
+      id="instructions"
+    >
+      <Text color="white">Nostr Space Instructions</Text>
+      <Text color="white">W: Move foward</Text>
+      <Text color="white">Mouse: Move camera direction</Text>
+      <Text color="white">E: View profile being touched</Text>
+      <Text color="white">C: Connect Nostr</Text>
+      <Text color="white">K: Keysend to developer</Text>
+      <Text color="white">I: Show / Hide instructions</Text>
+    </Box>
+  )
 }
 export default Game3D
