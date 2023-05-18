@@ -24,7 +24,8 @@ import makeBlockie from 'ethereum-blockies-base64';
 import { getAddressInfo, connectWallet,relays } from './utils';
 import {
   SimplePool,
-  nip19
+  nip19,
+  getEventHash
 } from 'nostr-tools'
 /**
  * Is touch device?
@@ -51,6 +52,7 @@ class MainScene extends Scene3D {
     this.move = false
     this.moveTop = 0
     this.moveRight = 0;
+    this.nostrPubKey = null;
     this.profiles = [];
     this.publickeys = [];
     this.maxProfiles = 100;
@@ -72,6 +74,7 @@ class MainScene extends Scene3D {
     }
     this.connecting = false;
     this.connected = true;
+    this.nostrPubKey = newNostrPubKey;
 
   }
 
@@ -118,6 +121,7 @@ class MainScene extends Scene3D {
       c: this.input.keyboard.addKey('c'),
       k: this.input.keyboard.addKey('k'),
       i: this.input.keyboard.addKey('i'),
+      o: this.input.keyboard.addKey('o'),
       space: this.input.keyboard.addKey(32)
     }
 
@@ -156,37 +160,52 @@ class MainScene extends Scene3D {
     if(!thread){
       thread = "2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c";
     }
-    let events = await pool.list(relays, [
-      {
-        '#e': [thread],
-        kinds: [1]
-      }
-    ])
-    const pubkeys = [... new Set(events.map(item => item.pubkey))];
-    const profiles = await pool.list(relays,[{
-      kinds: [0],
-      authors: pubkeys
-    },{
-      kinds: [0]
-    }])
-    console.log(profiles)
-    for(let i = 0; i < profiles.length; i++){
-      try{
-        if(this.profiles.length >= this.maxProfiles){
-          break
+    this.thread = thread;
+    let sub = pool.sub(
+      relays,
+      [
+        {
+          '#e': [thread],
+          kinds: [1]
         }
-        let info = {
-          x: getRandomInt(30)-getRandomInt(30),
-          z: getRandomInt(30)-getRandomInt(30),
-          profile: profiles[i]
+      ]
+    )
+
+    sub.on('event', async data => {
+      console.log(data);
+      if(this.profiles[data.pubkey]) return;
+      const subProfile = await pool.sub(relays, [{
+        authors: [
+          data.pubkey
+        ],
+        kinds: [0]
+      }]);
+      subProfile.on('event', async subProfileData => {
+        if(this.profiles[data.pubkey]) return;
+        const body = this.profiles[subProfileData.pubkey]
+        if(body){
+          this.third.physics.destroy(body);
+          const content = JSON.parse(data.content);
+          console.log(content)
+          const pos = JSON.parse(content['nostr-space-pos']);
+          body.position.set(pos.x,10,pos.z);
+          this.third.physics.add.existing(body)
+        } else {
+          let info = {
+            x: getRandomInt(30)-getRandomInt(30),
+            z: getRandomInt(30)-getRandomInt(30),
+            profile: subProfileData
+          }
+          console.log(info)
+          await this.addProfile(info);
         }
-        console.log(info)
-        await this.addProfile(info);
-        await delay(1000)
-      } catch(err){
-        console.log(err)
-      }
-    }
+
+      })
+
+    });
+    sub.on('eose', () => {
+      sub.unsub()
+    })
   }
 
   async generateScenario(){
@@ -329,6 +348,7 @@ class MainScene extends Scene3D {
 
       this.third.physics.add.existing(body);
       this.third.add.existing(body)
+      this.profiles[info.profile.pubkey] = body
       this.third.physics.add.collider(body, this.player, async event => {
         if(this.keys.e.isDown){
           if(info.profile.pubkey){
@@ -344,6 +364,50 @@ class MainScene extends Scene3D {
     }
   }
 
+  async occupy(){
+    try{
+      let content = JSON.parse(this.playerProfile.content);
+      content[`nostr-space-pos`] = JSON.stringify({x: this.player.body.position.x, z: this.player.body.position.z});
+
+      let event = {
+        kind: 1,
+        pubkey: this.nostrPubKey,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [['e', this.thread]],
+        content: `Nostr Space thread ${this.thread} update to position - (${this.player.body.position.x},${this.player.body.position.z})`
+      }
+      event.id = getEventHash(event)
+      event = await window.nostr.signEvent(event)
+      console.log(event)
+      let pubs = pool.publish(relays, event)
+      pubs.on('ok', (res) => {
+        console.log(res);
+      });
+
+      // Occupy
+      event = {
+        kind: 0,
+        pubkey: this.nostrPubKey,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [],
+        content: JSON.stringify(content)
+      }
+      event.id = getEventHash(event)
+      event = await window.nostr.signEvent(event)
+      pubs = pool.publish(relays, event)
+      pubs.on('ok', async (res) => {
+        console.log(res);
+        this.occuping = false;
+        const body = this.profiles[this.nostrPubKey];
+        this.third.physics.destroy(body);
+        body.position.set(this.player.position.x,10,this.player.position.z);
+        this.third.physics.add.existing(body);
+      });
+    } catch(err){
+      console.log(err)
+      this.occuping = false;
+    }
+  }
   async keysend(){
     if(!window.webln) return;
     await window.webln.enable();
@@ -423,6 +487,10 @@ class MainScene extends Scene3D {
         this.connecting = true;
         this.connect();
       }
+      if(window.nostr && this.keys.o.isDown && !this.occuping && this.connected){
+        this.occuping = true;
+        this.occupy();
+      }
       if(window.webln && this.keys.k.isDown && !this.keysending){
         this.keysending = true;
         this.keysend();
@@ -496,6 +564,7 @@ const Game3D =  () => {
       <Text color="white">Mouse: Move camera direction</Text>
       <Text color="white">E: View profile being touched</Text>
       <Text color="white">C: Connect Nostr</Text>
+      <Text color="white">O: Occupy position with your nostr profile</Text>
       <Text color="white">K: Keysend to developer</Text>
       <Text color="white">I: Show / Hide instructions</Text>
     </Box>
