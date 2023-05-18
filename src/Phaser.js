@@ -1,4 +1,4 @@
-import {useEffect} from  'react';
+import {useEffect,useState} from  'react';
 import Phaser from 'phaser';
 import chroma from "chroma-js";
 
@@ -17,6 +17,11 @@ import {
 import {
   Box,
   Text,
+  Modal,
+  ModalHeader,
+  TextInput,
+  Layer,
+  Button
  } from 'grommet';
 
 import makeBlockie from 'ethereum-blockies-base64';
@@ -39,6 +44,9 @@ function getRandomInt(max) {
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
 const pool = new SimplePool()
+
+let imgUri,showLayer;
+
 
 class MainScene extends Scene3D {
   constructor() {
@@ -122,6 +130,7 @@ class MainScene extends Scene3D {
       k: this.input.keyboard.addKey('k'),
       i: this.input.keyboard.addKey('i'),
       o: this.input.keyboard.addKey('o'),
+      l: this.input.keyboard.addKey('l'),
       space: this.input.keyboard.addKey(32)
     }
 
@@ -154,58 +163,50 @@ class MainScene extends Scene3D {
       buttonB.onRelease(() => (this.move = false))
     }
 
-    // Add nostr profiles to populate
-    let thread = window.location.href.split("?thread=")[1];
 
-    if(!thread){
-      thread = "2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c";
-    }
-    this.thread = thread;
     let sub = pool.sub(
       relays,
       [
         {
-          '#e': [thread],
+          '#t': ['nostr-space'],
+          kinds: [1]
+        },
+        {
+          '#e': ['2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c'],
           kinds: [1]
         }
       ]
     )
-
     sub.on('event', async data => {
       console.log(data);
-      if(this.profiles[data.pubkey]) return;
-      const subProfile = await pool.sub(relays, [{
+      let subProfileData = await pool.get(relays, {
         authors: [
           data.pubkey
         ],
         kinds: [0]
-      }]);
-      subProfile.on('event', async subProfileData => {
-        if(this.profiles[data.pubkey]) return;
-        const body = this.profiles[subProfileData.pubkey]
-        if(body){
-          this.third.physics.destroy(body);
-          const content = JSON.parse(data.content);
-          console.log(content)
-          const pos = JSON.parse(content['nostr-space-pos']);
-          body.position.set(pos.x,10,pos.z);
-          this.third.physics.add.existing(body)
-        } else {
-          let info = {
-            x: getRandomInt(30)-getRandomInt(30),
-            z: getRandomInt(30)-getRandomInt(30),
-            profile: subProfileData
-          }
-          console.log(info)
-          await this.addProfile(info);
+      });
+      const body = this.profiles[subProfileData.pubkey]
+      if(body){
+        this.third.physics.destroy(body);
+        const content = JSON.parse(subProfileData.content);
+        console.log(content)
+        const pos = JSON.parse(content['nostr-space-pos']);
+        body.position.set(pos.x,10,pos.z);
+        this.third.physics.add.existing(body)
+      } else {
+        let info = {
+          x: getRandomInt(30)-getRandomInt(30),
+          z: getRandomInt(30)-getRandomInt(30),
+          profile: subProfileData
         }
+        console.log(info)
+        await this.addProfile(info);
+      }
+
 
       })
 
-    });
-    sub.on('eose', () => {
-      sub.unsub()
-    })
+
   }
 
   async generateScenario(){
@@ -245,7 +246,8 @@ class MainScene extends Scene3D {
     this.player.name = playerName
     let playerImg
     if(!this.playerProfile){
-      playerImg = await this.third.load.texture("https://ipfs.io/ipfs/QmeVRmVLPqUNZUKERq14uXPYbyRoUN7UE8Sha2Q4rT6oyF");
+      // https://iris.to/note18q96a44le00tzrx4e0wm4fmh923634xr5vpuecuz8rtwv594ahpsld2h4e
+      playerImg = await this.third.load.texture("https://nostr.build/i/nostr.build_a3bc5db060142c8c49b9cc40d2024b1ac8e602c44bb68ea2d81a85a1135211dc.jpg");
     } else {
       const loader = new THREE.TextureLoader();
 
@@ -369,18 +371,67 @@ class MainScene extends Scene3D {
       let content = JSON.parse(this.playerProfile.content);
       content[`nostr-space-pos`] = JSON.stringify({x: this.player.body.position.x, z: this.player.body.position.z});
 
+      let event
+      let pubs;
+      // Occupy
+      event = {
+        kind: 0,
+        pubkey: this.nostrPubKey,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [],
+        content: JSON.stringify(content)
+      }
+      event.id = getEventHash(event)
+      event = await window.nostr.signEvent(event)
+      pubs = pool.publish(relays, event);
+
+      pubs.on('ok', async (res) => {
+        console.log(res);
+      });
+
+      event = {
+        kind: 1,
+        pubkey: this.nostrPubKey,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['e', '2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c'],
+          ['t', 'nostr-space']
+        ],
+        content: `Update to position - (${this.player.body.position.x},${this.player.body.position.z})`
+      }
+      event.id = getEventHash(event)
+      event = await window.nostr.signEvent(event)
+      console.log(event)
+      pubs = pool.publish(relays, event)
+      pubs.on('ok', (res) => {
+        console.log(res);
+      });
+
+    } catch(err){
+      console.log(err)
+      this.occuping = false;
+    }
+  }
+  async occupyWithImage(){
+    try{
+      let content = JSON.parse(this.playerProfile.content);
+      content[`nostr-space-pos-${getEventHash(imgUri)}`] = JSON.stringify({x: this.player.body.position.x, z: this.player.body.position.z,image: imgUri});
+
       let event = {
         kind: 1,
         pubkey: this.nostrPubKey,
         created_at: Math.floor(Date.now() / 1000),
-        tags: [['e', this.thread]],
-        content: `Nostr Space thread ${this.thread} update to position - (${this.player.body.position.x},${this.player.body.position.z})`
+        tags: [
+          ['e', '2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c'],
+          ['t', 'nostr-space']
+        ],
+        content: `Nostr Space - Image ${imgUri} - Position - (${this.player.body.position.x},${this.player.body.position.z})`
       }
       event.id = getEventHash(event)
       event = await window.nostr.signEvent(event)
       console.log(event)
       let pubs = pool.publish(relays, event)
-      pubs.on('ok', (res) => {
+      pubs.on('event', (res) => {
         console.log(res);
       });
 
@@ -395,13 +446,13 @@ class MainScene extends Scene3D {
       event.id = getEventHash(event)
       event = await window.nostr.signEvent(event)
       pubs = pool.publish(relays, event)
-      pubs.on('ok', async (res) => {
+      pubs.on('event', async (res) => {
         console.log(res);
         this.occuping = false;
         const body = this.profiles[this.nostrPubKey];
-        this.third.physics.destroy(body);
+        //this.third.physics.destroy(body);
         body.position.set(this.player.position.x,10,this.player.position.z);
-        this.third.physics.add.existing(body);
+        //this.third.physics.add.existing(body);
       });
     } catch(err){
       console.log(err)
@@ -491,6 +542,10 @@ class MainScene extends Scene3D {
         this.occuping = true;
         this.occupy();
       }
+      if(window.nostr && this.keys.o.isDown && !this.occuping && this.connected){
+        this.occuping = true;
+        this.occupy();
+      }
       if(window.webln && this.keys.k.isDown && !this.keysending){
         this.keysending = true;
         this.keysend();
@@ -522,6 +577,8 @@ const config = {
 let init = false;
 const Game3D =  () => {
 
+  const [show, setShow] = useState();
+  const [value,setValue] = useState();
 
   const keyDownHandler = event => {
       console.log('User pressed: ', event.key);
@@ -549,6 +606,7 @@ const Game3D =  () => {
   },[])
 
   return(
+    <>
     <Box
       style={{
         position: "absolute",
@@ -568,6 +626,29 @@ const Game3D =  () => {
       <Text color="white">K: Keysend to developer</Text>
       <Text color="white">I: Show / Hide instructions</Text>
     </Box>
+    {
+      show &&
+      <Layer
+        onEsc={() => {showLayer = false}}
+        onClickOutside={() => {showLayer = false}}
+        pad="xlarge"
+      >
+        <Text>Insert image url to place in current position</Text>
+        {
+          imgUri &&
+          <Text size="xsmall">imgUri</Text>
+        }
+        <TextInput
+          placeholder="Image url"
+          value={imgUri}
+          onChange={event => {imgUri = event.target.value}}
+        />
+        <Button label="Close" onClick={() => {
+          showLayer = false;
+        }} />
+      </Layer>
+    }
+    </>
   )
 }
 export default Game3D
