@@ -186,17 +186,17 @@ class MainScene extends Scene3D {
         kinds: [0]
       });
       const body = this.profiles[subProfileData.pubkey]
-      if(body){
+      if(body && data.tags[2][0] === 'nostr-space-position'){
         this.third.physics.destroy(body);
-        const content = JSON.parse(subProfileData.content);
-        console.log(content)
-        const pos = JSON.parse(content['nostr-space-pos']);
+        console.log(data.tags[2])
+        const pos = JSON.parse(data.tags[2][1]);
+        console.log(pos)
         body.position.set(pos.x,10,pos.z);
         this.third.physics.add.existing(body)
       } else {
         let info = {
-          x: getRandomInt(30)-getRandomInt(30),
-          z: getRandomInt(30)-getRandomInt(30),
+          x: data.tags[2] ? JSON.parse(data.tags[2][1]).x : (getRandomInt(20)-getRandomInt(20)),
+          z: data.tags[2] ? JSON.parse(data.tags[2][1]).z :getRandomInt(20)-getRandomInt(20),
           profile: subProfileData
         }
         console.log(info)
@@ -341,12 +341,7 @@ class MainScene extends Scene3D {
         sprite3d.setScale(0.001);
         body.add(sprite3d);
       }
-      if(content['nostr-space-pos']){
-        console.log(content['nostr-space-pos'])
-        body.position.set(JSON.parse(content['nostr-space-pos']).x,20,JSON.parse(content['nostr-space-pos']).z)
-      } else {
-        body.position.set(info.x,20,info.z)
-      }
+      body.position.set(info.x,20,info.z)
 
       this.third.physics.add.existing(body);
       this.third.add.existing(body)
@@ -368,42 +363,29 @@ class MainScene extends Scene3D {
 
   async occupy(){
     try{
-      let content = JSON.parse(this.playerProfile.content);
-      content[`nostr-space-pos`] = JSON.stringify({x: this.player.body.position.x, z: this.player.body.position.z});
+      const pos = {
+        x: this.player.body.position.x,
+        z: this.player.body.position.z
+      };
 
-      let event
-      let pubs;
       // Occupy
-      event = {
-        kind: 0,
-        pubkey: this.nostrPubKey,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [],
-        content: JSON.stringify(content)
-      }
-      event.id = getEventHash(event)
-      event = await window.nostr.signEvent(event)
-      pubs = pool.publish(relays, event);
-
-      pubs.on('ok', async (res) => {
-        console.log(res);
-      });
-
-      event = {
+      let event = {
         kind: 1,
         pubkey: this.nostrPubKey,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
           ['e', '2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c'],
-          ['t', 'nostr-space']
+          ['t', 'nostr-space'],
+          ['nostr-space-position',JSON.stringify(pos)]
         ],
         content: `Update to position - (${this.player.body.position.x},${this.player.body.position.z})`
       }
       event.id = getEventHash(event)
       event = await window.nostr.signEvent(event)
       console.log(event)
-      pubs = pool.publish(relays, event)
+      let pubs = pool.publish(relays, event)
       pubs.on('ok', (res) => {
+        this.occuping = false;
         console.log(res);
       });
 
@@ -414,16 +396,19 @@ class MainScene extends Scene3D {
   }
   async occupyWithImage(){
     try{
-      let content = JSON.parse(this.playerProfile.content);
-      content[`nostr-space-pos-${getEventHash(imgUri)}`] = JSON.stringify({x: this.player.body.position.x, z: this.player.body.position.z,image: imgUri});
-
+      const pos = {
+        x: this.player.body.position.x,
+        z: this.player.body.position.z
+      };
       let event = {
         kind: 1,
         pubkey: this.nostrPubKey,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
           ['e', '2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c'],
-          ['t', 'nostr-space']
+          ['t', 'nostr-space'],
+          ['nostr-space-image-position',JSON.stringify(pos)],
+          ['nostr-space-image-url',imgUri]
         ],
         content: `Nostr Space - Image ${imgUri} - Position - (${this.player.body.position.x},${this.player.body.position.z})`
       }
@@ -432,28 +417,10 @@ class MainScene extends Scene3D {
       console.log(event)
       let pubs = pool.publish(relays, event)
       pubs.on('event', (res) => {
+        this.occuping = false;
         console.log(res);
       });
 
-      // Occupy
-      event = {
-        kind: 0,
-        pubkey: this.nostrPubKey,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [],
-        content: JSON.stringify(content)
-      }
-      event.id = getEventHash(event)
-      event = await window.nostr.signEvent(event)
-      pubs = pool.publish(relays, event)
-      pubs.on('event', async (res) => {
-        console.log(res);
-        this.occuping = false;
-        const body = this.profiles[this.nostrPubKey];
-        //this.third.physics.destroy(body);
-        body.position.set(this.player.position.x,10,this.player.position.z);
-        //this.third.physics.add.existing(body);
-      });
     } catch(err){
       console.log(err)
       this.occuping = false;
