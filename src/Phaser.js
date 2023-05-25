@@ -67,7 +67,7 @@ class MainScene extends Scene3D {
     this.textures = [];
     this.images = [];
     this.maxProfiles = 100;
-
+    this.canShoot = true;
   }
 
   async connect() {
@@ -105,6 +105,16 @@ class MainScene extends Scene3D {
 
 
     await this.generatePlayer();
+
+
+
+    this.setControls();
+    this.subscribeNostrEvents();
+
+
+  }
+
+  setControls(){
     // set initial view to 90 deg theta
     this.controls.theta = 90;
     /**
@@ -128,6 +138,7 @@ class MainScene extends Scene3D {
       w: this.input.keyboard.addKey('w'),
       d: this.input.keyboard.addKey('d'),
       s: this.input.keyboard.addKey('s'),
+      f: this.input.keyboard.addKey('f'),
       e: this.input.keyboard.addKey('e'),
       c: this.input.keyboard.addKey('c'),
       k: this.input.keyboard.addKey('k'),
@@ -165,8 +176,8 @@ class MainScene extends Scene3D {
       buttonB.onClick(() => (this.move = true))
       buttonB.onRelease(() => (this.move = false))
     }
-
-
+  }
+  async subscribeNostrEvents(){
     let sub = pool.sub(
       relays,
       [
@@ -190,7 +201,7 @@ class MainScene extends Scene3D {
       });
       let body = this.profiles[subProfileData.pubkey]
       if(data.tags[2]){
-        if(body && data.tags[2][0] === 'nostr-space-position'){
+        if(body && (data.tags[2][0] === 'nostr-space-position')){
           this.third.physics.destroy(body);
           console.log(data.tags[2])
           const pos = JSON.parse(data.tags[2][1]);
@@ -198,7 +209,7 @@ class MainScene extends Scene3D {
           body.position.set(pos.x,10,pos.z);
           this.third.physics.add.existing(body);
           this.profiles[subProfileData.pubkey] = body
-        } else {
+        } else if(!body && data.tags[2][0] === 'nostr-space-position'){
           let info = {
             x: data.tags[2] ? JSON.parse(data.tags[2][1]).x : (getRandomInt(20)-getRandomInt(20)),
             y: 15,
@@ -209,6 +220,8 @@ class MainScene extends Scene3D {
           await this.addProfile(info,false);
         }
       }
+
+
 
       body = this.players[subProfileData.pubkey]
 
@@ -223,24 +236,82 @@ class MainScene extends Scene3D {
           //this.players[subProfileData.pubkey] = body
         } else if(data.tags[1][0] === 'nostr-space-movement'){
           console.log(data.tags[1])
-
           let info = {
             x: JSON.parse(data.tags[1][1]).x,
             y: JSON.parse(data.tags[1][1]).y,
             z: JSON.parse(data.tags[1][1]).z,
             profile: subProfileData
           }
-          console.log(info)
           await this.addProfile(info,true);
+        } else if(data.tags[1][0] === 'nostr-space-shoot'){
+          console.log("Shoooot")
+          const pos = new THREE.Vector3();
+          const obj = JSON.parse(data.tags[1][1]);
+          pos.copy(obj.direction)
+          pos.add(obj.origin)
+
+          const sphere = this.third.physics.add.sphere(
+            { radius: 0.050, x: pos.x, y: pos.y, z: pos.z, mass: 10, bufferGeometry: true },
+            { phong: { color: 0x202020 } }
+          );
+
+          const force = 8;
+          pos.copy(obj.direction)
+          pos.multiplyScalar(10)
+          sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
+
+          setTimeout(() => {
+            this.third.destroy(sphere);
+          },2000)
+          sphere.body.on.collision((otherObject, event) => {
+            if (otherObject.name !== 'ground')
+            if(otherObject.name === this.player.name){
+              this.third.physics.destroy(this.player)
+              this.player.position.set(2, 4, -1);
+              this.third.destroy(sphere);
+              this.third.physics.add.existing(this.player)
+            }
+          })
         }
       }
 
 
       })
-
-
   }
+  async shoot(){
 
+    const raycaster = new THREE.Raycaster()
+    const x = 0
+    const y = 0.8
+    const pos = new THREE.Vector3();
+
+    raycaster.setFromCamera({ x, y }, this.third.camera);
+
+
+    let msgSend = {
+      direction: raycaster.ray.direction,
+      origin: raycaster.ray.origin,
+    };
+    // Shoot
+    let event = {
+      kind: 29001,
+      pubkey: this.nostrPubKey,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ['t', 'nostr-space'],
+        ['nostr-space-shoot',JSON.stringify(msgSend)]
+      ],
+      content: `Shoot at position - (${this.player.body.position.x},${this.player.body.position.z})`
+    }
+    event.id = getEventHash(event)
+    event = await window.nostr.signEvent(event)
+    console.log(event)
+    let pubs = pool.publish(relays, event)
+    pubs.on('ok', (res) => {
+      this.occuping = false;
+      console.log(res);
+    });
+  }
   async generateScenario(){
 
       // heightmap from https://medium.com/@travall/procedural-2d-island-generation-noise-functions-13976bddeaf9
@@ -265,7 +336,7 @@ class MainScene extends Scene3D {
       * Create Player
     */
     // create text texture
-    let playerName = "Guest "+getRandomInt(10000);
+    let playerName = "Guest "+getRandomInt(1000000000);
     let content;
     if(this.playerProfile){
       content = JSON.parse(this.playerProfile.content);
@@ -469,13 +540,13 @@ class MainScene extends Scene3D {
       console.log(event)
       let pubs = pool.publish(relays, event)
       pubs.on('ok', (res) => {
-        this.moving = false;
+        //this.moving = false;
         console.log(res);
       });
 
     } catch(err){
       console.log(err)
-      this.moving = false;
+      //this.moving = false;
     }
   }
   async occupyWithImage(){
@@ -596,9 +667,26 @@ class MainScene extends Scene3D {
         this.occuping = true;
         this.occupy();
       }
-      if(window.nostr && !this.moving && this.connected && Math.round(this.time.now) % 20 === 0){
+      if(window.nostr && !this.moving && this.connected){
         this.moving = true;
+        this.time.addEvent({
+          delay: 1500,
+          callback: () => {
+            this.moving = false
+          }
+        })
         this.setPlayerPos();
+      }
+      if(window.nostr && this.keys.f.isDown && this.canShoot && this.connected){
+        this.canShoot = false;
+        this.time.addEvent({
+          delay: 2000,
+          callback: () => {
+            this.canShoot = true
+          }
+        })
+        this.shoot();
+
       }
 
       if(window.webln && this.keys.k.isDown && !this.keysending){
@@ -673,6 +761,7 @@ const Game3D =  () => {
     >
       <Text color="white">Nostr Space Instructions</Text>
       <Text color="white">W: Move foward</Text>
+      <Text color="white">F: Throw sphere</Text>
       <Text color="white">Mouse: Move camera direction</Text>
       <Text color="white">E: View profile being touched</Text>
       <Text color="white">C: Connect Nostr</Text>
