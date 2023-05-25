@@ -62,7 +62,10 @@ class MainScene extends Scene3D {
     this.moveRight = 0;
     this.nostrPubKey = null;
     this.profiles = [];
+    this.players = [];
     this.publickeys = [];
+    this.textures = [];
+    this.images = [];
     this.maxProfiles = 100;
 
   }
@@ -169,7 +172,7 @@ class MainScene extends Scene3D {
       [
         {
           '#t': ['nostr-space'],
-          kinds: [1]
+          kinds: [1,29001]
         },
         {
           '#e': ['2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c'],
@@ -185,22 +188,51 @@ class MainScene extends Scene3D {
         ],
         kinds: [0]
       });
-      const body = this.profiles[subProfileData.pubkey]
-      if(body && data.tags[2][0] === 'nostr-space-position'){
-        this.third.physics.destroy(body);
-        console.log(data.tags[2])
-        const pos = JSON.parse(data.tags[2][1]);
-        console.log(pos)
-        body.position.set(pos.x,10,pos.z);
-        this.third.physics.add.existing(body)
-      } else {
-        let info = {
-          x: data.tags[2] ? JSON.parse(data.tags[2][1]).x : (getRandomInt(20)-getRandomInt(20)),
-          z: data.tags[2] ? JSON.parse(data.tags[2][1]).z :getRandomInt(20)-getRandomInt(20),
-          profile: subProfileData
+      let body = this.profiles[subProfileData.pubkey]
+      if(data.tags[2]){
+        if(body && data.tags[2][0] === 'nostr-space-position'){
+          this.third.physics.destroy(body);
+          console.log(data.tags[2])
+          const pos = JSON.parse(data.tags[2][1]);
+          console.log(pos)
+          body.position.set(pos.x,10,pos.z);
+          this.third.physics.add.existing(body);
+          this.profiles[subProfileData.pubkey] = body
+        } else {
+          let info = {
+            x: data.tags[2] ? JSON.parse(data.tags[2][1]).x : (getRandomInt(20)-getRandomInt(20)),
+            y: 15,
+            z: data.tags[2] ? JSON.parse(data.tags[2][1]).z :getRandomInt(20)-getRandomInt(20),
+            profile: subProfileData
+          }
+          console.log(info)
+          await this.addProfile(info,false);
         }
-        console.log(info)
-        await this.addProfile(info);
+      }
+
+      body = this.players[subProfileData.pubkey]
+
+      if(data.tags[1]){
+        if(body && data.tags[1][0] === 'nostr-space-movement'){
+          //this.third.destroy(body);
+          console.log(data.tags[1])
+          const pos = JSON.parse(data.tags[1][1]);
+          console.log(pos)
+          body.position.set(pos.x,pos.y,pos.z);
+          //this.third.add.existing(body);
+          //this.players[subProfileData.pubkey] = body
+        } else if(data.tags[1][0] === 'nostr-space-movement'){
+          console.log(data.tags[1])
+
+          let info = {
+            x: JSON.parse(data.tags[1][1]).x,
+            y: JSON.parse(data.tags[1][1]).y,
+            z: JSON.parse(data.tags[1][1]).z,
+            profile: subProfileData
+          }
+          console.log(info)
+          await this.addProfile(info,true);
+        }
       }
 
 
@@ -222,9 +254,10 @@ class MainScene extends Scene3D {
      const mesh = this.third.heightMap.add(heightmap, { colorScale })
      if (mesh) {
        // we position, scale, rotate etc. the mesh before adding physics to it
-       mesh.scale.set(5, 5, 1)
+       mesh.scale.set(5, 5, 1.3)
        this.third.physics.add.existing(mesh, { mass: 0 })
      }
+
 
   }
   async generatePlayer(){
@@ -283,9 +316,9 @@ class MainScene extends Scene3D {
       targetRadius: 2
     });
   }
-  async addProfile(info){
+  async addProfile(info,player){
     const content = JSON.parse(info.profile.content);
-    if(this.publickeys[content.name ? content.name : content.display_name ? content.display_name : info.profile.pubkey]) return;
+    if(this.publickeys[content.name ? content.name : content.display_name ? content.display_name : info.profile.pubkey] && !player) return;
     this.publickeys[content.name] = true;
     let metadata;
     if(!content.name && !content.display_name){
@@ -308,30 +341,41 @@ class MainScene extends Scene3D {
       let sprite3d = new FLAT.TextSprite(texture)
       sprite3d.position.y = 1.2;
       sprite3d.setScale(0.0025);
-      let image;
-      const loader = new THREE.TextureLoader();
+      let image = this.images[info.profile.pubkey];
+      if(!image){
+        const loader = new THREE.TextureLoader();
 
-      loader.setCrossOrigin('anonymous')
-      try{
-        image = await loader.load(metadata.image);
-      } catch(err){
-        image = makeBlockie(info.profile.pubkey);
+        loader.setCrossOrigin('anonymous')
+        try{
+          image = await loader.load(metadata.image);
+        } catch(err){
+          image = makeBlockie(info.profile.pubkey);
+        }
       }
-      const textureCube = this.third.misc.textureCube([image,image,image,image,image,image])
-      const body = this.third.add.box({
+      console.log(image)
+      let textureCube = this.textures[info.profile.pubkey];
+      if(!textureCube){
+        textureCube = this.third.misc.textureCube([image,image,image,image,image,image])
+        this.textures[info.profile.pubkey] = textureCube;
+      }
+      let body = this.third.add.box({
         width: 0.5,
         height: 0.3,
         depth: 0.5
       }, {
         custom: textureCube.materials
       });
+      if(player){
+        body = new THREE.Group();
+      }
+
       const material = new THREE.SpriteMaterial( { map: image } );
       const sprite = new THREE.Sprite( material );
       sprite.position.y = 0.4
       sprite.scale.set(0.5,0.5,0.5)
       body.add(sprite3d);
       body.add(sprite);
-      if(metadata.description){
+      if(metadata.description && !player){
         text = `${metadata.description}`;
         texture = new FLAT.TextTexture(`${text}`);
 
@@ -341,21 +385,28 @@ class MainScene extends Scene3D {
         sprite3d.setScale(0.001);
         body.add(sprite3d);
       }
-      body.position.set(info.x,20,info.z)
+      body.position.set(info.x,info.y,info.z)
 
-      this.third.physics.add.existing(body);
       this.third.add.existing(body)
-      this.profiles[info.profile.pubkey] = body
-      this.third.physics.add.collider(body, this.player, async event => {
-        if(this.keys.e.isDown){
-          if(info.profile.pubkey){
-            let yes = window.confirm(`Open https://iris.to/${nip19.npubEncode(info.profile.pubkey)} in a new tab?` );
-            if(yes) {
-              window.open(`https://iris.to/${nip19.npubEncode(info.profile.pubkey)}`,"_blank")
+      //this.third.add.existing(body);
+      if(player){
+        this.players[info.profile.pubkey] = body
+      } else {
+        this.third.physics.add.existing(body);
+        this.profiles[info.profile.pubkey] = body
+        this.third.physics.add.collider(body, this.player, async event => {
+          body.setVelocity(0,0,0)
+          if(this.keys.e.isDown){
+            if(info.profile.pubkey){
+              let yes = window.confirm(`Open https://iris.to/${nip19.npubEncode(info.profile.pubkey)} in a new tab?` );
+              if(yes) {
+                window.open(`https://iris.to/${nip19.npubEncode(info.profile.pubkey)}`,"_blank")
+              }
             }
           }
-        }
-      });
+        });
+      }
+
     } catch(err){
       console.log(err)
     }
@@ -394,6 +445,39 @@ class MainScene extends Scene3D {
       this.occuping = false;
     }
   }
+  async setPlayerPos(){
+    try{
+      const pos = {
+        x: this.player.position.x,
+        y: this.player.position.y,
+        z: this.player.position.z
+      };
+      console.log(pos)
+      // Position
+      let event = {
+        kind: 29001,
+        pubkey: this.nostrPubKey,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['t', 'nostr-space'],
+          ['nostr-space-movement',JSON.stringify(pos)]
+        ],
+        content: `Moved to position - (${this.player.body.position.x},${this.player.body.position.y},${this.player.body.position.z})`
+      }
+      event.id = getEventHash(event)
+      event = await window.nostr.signEvent(event)
+      console.log(event)
+      let pubs = pool.publish(relays, event)
+      pubs.on('ok', (res) => {
+        this.moving = false;
+        console.log(res);
+      });
+
+    } catch(err){
+      console.log(err)
+      this.moving = false;
+    }
+  }
   async occupyWithImage(){
     try{
       const pos = {
@@ -420,6 +504,9 @@ class MainScene extends Scene3D {
         this.occuping = false;
         console.log(res);
       });
+      setTimeout(() => {
+        this.occuping = false;
+      },[1000])
 
     } catch(err){
       console.log(err)
@@ -509,10 +596,11 @@ class MainScene extends Scene3D {
         this.occuping = true;
         this.occupy();
       }
-      if(window.nostr && this.keys.o.isDown && !this.occuping && this.connected){
-        this.occuping = true;
-        this.occupy();
+      if(window.nostr && !this.moving && this.connected && Math.round(this.time.now) % 20 === 0){
+        this.moving = true;
+        this.setPlayerPos();
       }
+
       if(window.webln && this.keys.k.isDown && !this.keysending){
         this.keysending = true;
         this.keysend();
@@ -548,7 +636,6 @@ const Game3D =  () => {
   const [value,setValue] = useState();
 
   const keyDownHandler = event => {
-      console.log('User pressed: ', event.key);
 
       if (event.key === 'i') {
         event.preventDefault();
