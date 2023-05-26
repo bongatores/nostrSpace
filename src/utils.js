@@ -1,3 +1,4 @@
+import {nip19, generatePrivateKey, getPublicKey} from 'nostr-tools'
 
 
 export const ordinalsUrl = (utxo) => {
@@ -14,17 +15,34 @@ export const cloudfrontUrl = (utxo) => {
 
 
 export const connectWallet = async () => {
-  if (window.nostr && window.nostr.enable) {
-    await window.nostr.enable()
+  if (window.nostr) {
+    return await window.nostr.getPublicKey();
   } else {
     alert("Oops, it looks like you haven't set up your Nostr key yet. Go to your Alby Account Settings and create or import a Nostr key.")
     return
   }
-  return await window.nostr.getPublicKey()
+}
+export const generateKeys = async () => {
+
+  let sk = localStorage.getItem('nostr-sk');
+  if(!sk){
+    sk = generatePrivateKey();
+  }
+  localStorage.setItem('nostr-sk',sk);
+  let nsec = nip19.nsecEncode(sk)
+  let {type, data} = nip19.decode(nsec);
+  let pk = getPublicKey(sk)
+  let npub = nip19.npubEncode(pk)
+  return({
+    pk: pk,
+    npub: npub,
+    sk: sk
+  });
 }
 
 export const relays = [
   'wss://relay.damus.io',
+  'wss://relay2.nostrchat.io',
   'wss://relay.snort.social',
   'wss://nostr-01.bolt.observer'
 ]

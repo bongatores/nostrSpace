@@ -1,6 +1,7 @@
 import {useEffect,useState} from  'react';
 import Phaser from 'phaser';
 import chroma from "chroma-js";
+import 'websocket-polyfill'
 
 import {
   enable3d,
@@ -21,16 +22,21 @@ import {
   ModalHeader,
   TextInput,
   Layer,
-  Button
+  Button,
+  Tabs,
+  Tab
  } from 'grommet';
 
 import makeBlockie from 'ethereum-blockies-base64';
 
-import { getAddressInfo, connectWallet,relays } from './utils';
+import { getAddressInfo, connectWallet,generateKeys,relays } from './utils';
 import {
   SimplePool,
   nip19,
-  getEventHash
+  getEventHash,
+  signEvent,
+  validateEvent,
+  verifySignature,
 } from 'nostr-tools'
 /**
  * Is touch device?
@@ -45,7 +51,7 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
 
 const pool = new SimplePool()
 
-let imgUri,showLayer;
+let imgUri;
 
 
 class MainScene extends Scene3D {
@@ -82,7 +88,7 @@ class MainScene extends Scene3D {
       content: `Just entered the space!`
     }
     event.id = getEventHash(event)
-    event = await window.nostr.signEvent(event)
+    event = await this.signEvent(event);
     console.log(event)
     let pubs = pool.publish(relays, event)
     pubs.on('ok', (res) => {
@@ -90,13 +96,26 @@ class MainScene extends Scene3D {
     });
   }
   async connect() {
-    const newNostrPubKey = await connectWallet();
-    const newProfile = await pool.get(relays, {
+    let newNostrPubKey;
+    if(window.nostr){
+      newNostrPubKey = await connectWallet();
+    } else {
+      const keys = await generateKeys();
+      newNostrPubKey = keys.pk;
+      this.sk = keys.sk;
+    }
+    let newProfile = await pool.get(relays, {
       authors: [
         newNostrPubKey
       ],
       kinds: [0]
-    })
+    });
+    console.log(newProfile)
+    if(!newProfile){
+      newProfile = {
+        pubkey: newNostrPubKey
+      }
+    }
     this.playerProfile = newProfile;
     if(this.player){
       this.third.destroy(this.player);
@@ -105,6 +124,11 @@ class MainScene extends Scene3D {
     this.connecting = false;
     this.connected = true;
     this.nostrPubKey = newNostrPubKey;
+    const imgTab = document.getElementById("addImgTab");
+    imgTab.style.display = "flex";
+    const nostrInfo = document.getElementById("nostrInfo");
+    nostrInfo.style.display = "flex";
+
     this.time.addEvent({
       delay: 2000,
       callback: () => {
@@ -115,7 +139,6 @@ class MainScene extends Scene3D {
 
   async create() {
     const { lights } = await this.third.warpSpeed('-ground', '-orbitControls')
-
     const { hemisphereLight, ambientLight, directionalLight } = lights
     const intensity = 0.65
     hemisphereLight.intensity = intensity
@@ -207,7 +230,7 @@ class MainScene extends Scene3D {
       [
         {
           '#t': ['nostr-space'],
-          kinds: [1,29001]
+          kinds: [1,29211]
         },
         {
           '#e': ['2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c'],
@@ -223,6 +246,12 @@ class MainScene extends Scene3D {
         ],
         kinds: [0]
       });
+      console.log(subProfileData)
+      if(!subProfileData){
+        subProfileData = {
+          pubkey: data.pubkey
+        }
+      }
       let body = this.profiles[subProfileData.pubkey]
       if(data.tags[2]){
         if(body && (data.tags[2][0] === 'nostr-space-position')){
@@ -250,7 +279,7 @@ class MainScene extends Scene3D {
       body = this.players[subProfileData.pubkey]
 
       if(data.tags[1]){
-        if(body && data.tags[1][0] === 'nostr-space-movement'){
+        if(body && data.tags[1][0] === 'nostr-space-movement' && subProfileData.pubkey !== this.nostrPubKey){
           //this.third.destroy(body);
           console.log(data.tags[1])
           const pos = JSON.parse(data.tags[1][1]);
@@ -258,7 +287,7 @@ class MainScene extends Scene3D {
           body.position.set(pos.x,pos.y,pos.z);
           //this.third.add.existing(body);
           //this.players[subProfileData.pubkey] = body
-        } else if(data.tags[1][0] === 'nostr-space-movement'){
+        } else if(data.tags[1][0] === 'nostr-space-movement' && subProfileData.pubkey !== this.nostrPubKey){
           console.log(data.tags[1])
           let info = {
             x: JSON.parse(data.tags[1][1]).x,
@@ -302,6 +331,14 @@ class MainScene extends Scene3D {
 
       })
   }
+  async signEvent(event){
+    if(window.nostr){
+      event = await window.nostr.signEvent(event)
+    } else if(this.sk){
+      event.sig = signEvent(event, this.sk);
+    }
+    return(event);
+  }
   async shoot(){
 
     const raycaster = new THREE.Raycaster()
@@ -318,7 +355,7 @@ class MainScene extends Scene3D {
     };
     // Shoot
     let event = {
-      kind: 29001,
+      kind: 29211,
       pubkey: this.nostrPubKey,
       created_at: Math.floor(Date.now() / 1000),
       tags: [
@@ -328,13 +365,16 @@ class MainScene extends Scene3D {
       content: `Shoot at position - (${this.player.body.position.x},${this.player.body.position.z})`
     }
     event.id = getEventHash(event)
-    event = await window.nostr.signEvent(event)
+    event = await this.signEvent(event);
     console.log(event)
     let pubs = pool.publish(relays, event)
     pubs.on('ok', (res) => {
       this.occuping = false;
       console.log(res);
     });
+    pubs.on('failed', (relay,reason) => {
+      console.log(`failed to publish to ${relay} ${reason}`)
+    })
   }
   async generateScenario(){
 
@@ -360,11 +400,15 @@ class MainScene extends Scene3D {
       * Create Player
     */
     // create text texture
-    let playerName = "Guest "+getRandomInt(1000000000);
+    let playerName = "Spectator "+getRandomInt(1000);
     let content;
     if(this.playerProfile){
-      content = JSON.parse(this.playerProfile.content);
-      playerName = content.name ? content.name : content.display_name ? content.display_name : this.playerProfile.profile.pubkey
+      try{
+        content = JSON.parse(this.playerProfile.content);
+        playerName = content.name ? content.name : content.display_name ? content.display_name : nip19.npubEncode(this.playerProfile.pubkey)
+      } catch(err){
+        playerName = nip19.npubEncode(this.playerProfile.pubkey)
+      }
     }
     let texture = new FLAT.TextTexture(playerName);
     // texture in 3d space
@@ -375,13 +419,16 @@ class MainScene extends Scene3D {
     let playerImg
     if(!this.playerProfile){
       // https://iris.to/note18q96a44le00tzrx4e0wm4fmh923634xr5vpuecuz8rtwv594ahpsld2h4e
-      playerImg = await this.third.load.texture("https://nostr.build/i/nostr.build_a3bc5db060142c8c49b9cc40d2024b1ac8e602c44bb68ea2d81a85a1135211dc.jpg");
+      playerImg = this.defaultImage ?
+                  this.defaultImage :
+                  await this.third.load.texture("https://nostr.build/i/nostr.build_a3bc5db060142c8c49b9cc40d2024b1ac8e602c44bb68ea2d81a85a1135211dc.jpg");
+      this.defaultImage = playerImg;
     } else {
       const loader = new THREE.TextureLoader();
 
       loader.setCrossOrigin('anonymous')
-      playerImg = content.picture ? await loader.load(content.picture) :
-                  await this.third.load.texture(makeBlockie(this.playerProfile.profile.pubkey))
+      playerImg = content?.picture ? await loader.load(content.picture) :
+                  await this.third.load.texture(makeBlockie(nip19.npubEncode(this.playerProfile.pubkey)))
     }
     const material = new THREE.SpriteMaterial( { map: playerImg } );
     const sprite = new THREE.Sprite( material );
@@ -412,21 +459,24 @@ class MainScene extends Scene3D {
     });
   }
   async addProfile(info,player){
-    const content = JSON.parse(info.profile.content);
-    if(this.publickeys[content.name ? content.name : content.display_name ? content.display_name : info.profile.pubkey] && !player) return;
-    this.publickeys[content.name] = true;
-    let metadata;
-    if(!content.name && !content.display_name){
-      return;
+    let content;
+    try{
+      content = JSON.parse(info.profile.content);
+    } catch(err){
+      console.log(err);
     }
+    console.log(info.profile)
+    if(this.publickeys[info.profile.pubkey] && !player) return;
+    this.publickeys[info.profile.pubkey] = true;
+    let metadata;
     try{
       metadata = {
-        name: content.display_name ? content.display_name : content.name ? content.name : info.profile.pubkey,
-        description: content.about,
-        image: content.picture ?
+        name: content?.display_name ? content.display_name : content?.name ? content.name : nip19.npubEncode(info.profile.pubkey),
+        description: content?.about,
+        image: content?.picture ?
           content.picture :
-          makeBlockie(info.profile.pubkey),
-        external_url: content.website
+          makeBlockie(nip19.npubEncode(info.profile.pubkey)),
+        external_url: content?.website
       }
 
       // create text texture
@@ -482,15 +532,14 @@ class MainScene extends Scene3D {
       }
       body.position.set(info.x,info.y,info.z)
 
-      this.third.add.existing(body)
-      //this.third.add.existing(body);
+      this.third.add.existing(body);
+
       if(player){
         this.players[info.profile.pubkey] = body
       } else {
         this.third.physics.add.existing(body);
         this.profiles[info.profile.pubkey] = body
         this.third.physics.add.collider(body, this.player, async event => {
-          body.setVelocity(0,0,0)
           if(this.keys.e.isDown){
             if(info.profile.pubkey){
               let yes = window.confirm(`Open https://iris.to/${nip19.npubEncode(info.profile.pubkey)} in a new tab?` );
@@ -527,7 +576,7 @@ class MainScene extends Scene3D {
         content: `Update to position - (${this.player.body.position.x},${this.player.body.position.z})`
       }
       event.id = getEventHash(event)
-      event = await window.nostr.signEvent(event)
+      event = await this.signEvent(event);
       console.log(event)
       let pubs = pool.publish(relays, event)
       pubs.on('ok', (res) => {
@@ -550,7 +599,7 @@ class MainScene extends Scene3D {
       console.log(pos)
       // Position
       let event = {
-        kind: 29001,
+        kind: 29211,
         pubkey: this.nostrPubKey,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
@@ -560,7 +609,7 @@ class MainScene extends Scene3D {
         content: `Moved to position - (${this.player.body.position.x},${this.player.body.position.y},${this.player.body.position.z})`
       }
       event.id = getEventHash(event)
-      event = await window.nostr.signEvent(event)
+      event = await this.signEvent(event);
       console.log(event)
       let pubs = pool.publish(relays, event)
       pubs.on('ok', (res) => {
@@ -592,7 +641,7 @@ class MainScene extends Scene3D {
         content: `Nostr Space - Image ${imgUri} - Position - (${this.player.body.position.x},${this.player.body.position.z})`
       }
       event.id = getEventHash(event)
-      event = await window.nostr.signEvent(event)
+      event = await this.signEvent(event);
       console.log(event)
       let pubs = pool.publish(relays, event)
       pubs.on('event', (res) => {
@@ -683,7 +732,7 @@ class MainScene extends Scene3D {
         this.jump()
       }
 
-      if(window.nostr && this.keys.c.isDown && !this.connecting && !this.connected){
+      if(this.keys.c.isDown && !this.connecting && !this.connected){
         this.connecting = true;
         this.connect();
       }
@@ -691,17 +740,18 @@ class MainScene extends Scene3D {
         this.occuping = true;
         this.occupy();
       }
-      if(window.nostr && !this.moving && this.connected){
+
+      if(!this.moving && this.connected){
         this.moving = true;
         this.time.addEvent({
-          delay: 1500,
+          delay: 500,
           callback: () => {
             this.moving = false
           }
         })
         this.setPlayerPos();
       }
-      if(window.nostr && this.keys.f.isDown && this.canShoot && this.connected){
+      if(this.keys.f.isDown && this.canShoot && this.connected){
         this.canShoot = false;
         this.time.addEvent({
           delay: 2000,
@@ -753,7 +803,6 @@ const Game3D =  () => {
         event.preventDefault();
 
         const instructions = document.getElementById("instructions");
-        console.log(instructions.style.display)
         if(instructions.style.display === "none"){
           instructions.style.display = "flex"
         } else {
@@ -773,54 +822,69 @@ const Game3D =  () => {
 
   return(
     <>
-    <Box
-      style={{
-        position: "absolute",
-        zIndex: 100,
-        border: "2px solid black"
+    <Layer
+      onEsc={(e) => {
+        const layer = document.getElementById('instructions');
+        layer.style.display = "none"
       }}
-      background="blue"
-      alignContent="justify"
+      onClickOutside={() => {
+        const layer = document.getElementById('instructions');
+        layer.style.display = "none"
+      }}
+      pad="xlarge"
       id="instructions"
     >
-      <Text color="white">Nostr Space Instructions</Text>
-      <Text color="white">W: Move foward</Text>
-      <Text color="white">F: Throw sphere</Text>
-      <Text color="white">Mouse: Move camera direction</Text>
-      <Text color="white">E: View profile being touched</Text>
-      {
-        window.nostr &&
-        <Text color="white">C: Connect Nostr</Text>
-      }
-      <Text color="white">O: Occupy position with your nostr profile</Text>
-      {
-        window.webln &&
-        <Text color="white">K: Keysend to developer</Text>
-      }
-      <Text color="white">I: Show / Hide instructions</Text>
+    <Box pad="medium">
+      <Tabs>
+        <Tab title="Instructions">
+          <Box pad="medium">
+            <Text >Nostr Space Instructions</Text>
+            <Text >W: Move foward</Text>
+            <Text >C: Connect Nostr</Text>
+            <Text >F: Throw sphere (once connected)</Text>
+            <Text >Mouse: Move camera direction</Text>
+            <Text >E: View profile being touched</Text>
+            {
+              window.nostr &&
+              <Text >O: Occupy position with your nostr profile</Text>
+            }
+            {
+              window.webln &&
+              <Text >K: Keysend to developer</Text>
+            }
+            <Text >I: Show / Hide instructions</Text>
+          </Box>
+        </Tab>
+        <Tab title="Add Image" id="addImgTab" style={{display: "none"}}>
+          <Box pad="medium">
+            <Text>Insert image url to place in current position</Text>
+            {
+              imgUri &&
+              <Text size="xsmall">imgUri</Text>
+            }
+            <TextInput
+              placeholder="Image url"
+              value={imgUri}
+              onChange={event => {imgUri = event.target.value}}
+            />
+          </Box>
+        </Tab>
+        <Tab title="Nostr Info" id="nostrInfo" style={{display: "none"}}>
+          <Box pad="medium">
+            <Text>Edit your profile at any nostr client</Text>
+            <Text>npub</Text>
+            <Text id="npub"></Text>
+            <Text>sk</Text>
+            <Text id="sk"></Text>
+          </Box>
+        </Tab>
+      </Tabs>
+      <Button label="Close" onClick={() => {
+        const layer = document.getElementById('instructions');
+        layer.style.display = "none"
+      }} />
     </Box>
-    {
-      show &&
-      <Layer
-        onEsc={() => {showLayer = false}}
-        onClickOutside={() => {showLayer = false}}
-        pad="xlarge"
-      >
-        <Text>Insert image url to place in current position</Text>
-        {
-          imgUri &&
-          <Text size="xsmall">imgUri</Text>
-        }
-        <TextInput
-          placeholder="Image url"
-          value={imgUri}
-          onChange={event => {imgUri = event.target.value}}
-        />
-        <Button label="Close" onClick={() => {
-          showLayer = false;
-        }} />
-      </Layer>
-    }
+    </Layer>
     </>
   )
 }
