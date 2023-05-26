@@ -744,7 +744,7 @@ class MainScene extends Scene3D {
       if(!this.moving && this.connected){
         this.moving = true;
         this.time.addEvent({
-          delay: 500,
+          delay: 1500,
           callback: () => {
             this.moving = false
           }
