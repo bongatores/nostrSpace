@@ -69,7 +69,26 @@ class MainScene extends Scene3D {
     this.maxProfiles = 100;
     this.canShoot = true;
   }
-
+  async sendEnteredGameMsg(){
+    // Shoot
+    let event = {
+      kind: 42,
+      pubkey: this.nostrPubKey,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ['e','6afddc25a8ed486b0c1e6e556077a9eef3e0d7236014b891495ae20d557a2346','wss://relay2.nostrchat.io','root'],
+        ['t', 'nostr-space']
+      ],
+      content: `Just entered the space!`
+    }
+    event.id = getEventHash(event)
+    event = await window.nostr.signEvent(event)
+    console.log(event)
+    let pubs = pool.publish(relays, event)
+    pubs.on('ok', (res) => {
+      console.log(res);
+    });
+  }
   async connect() {
     const newNostrPubKey = await connectWallet();
     const newProfile = await pool.get(relays, {
@@ -86,7 +105,12 @@ class MainScene extends Scene3D {
     this.connecting = false;
     this.connected = true;
     this.nostrPubKey = newNostrPubKey;
-
+    this.time.addEvent({
+      delay: 2000,
+      callback: () => {
+        this.sendEnteredGameMsg();
+      }
+    });
   }
 
   async create() {
@@ -764,9 +788,15 @@ const Game3D =  () => {
       <Text color="white">F: Throw sphere</Text>
       <Text color="white">Mouse: Move camera direction</Text>
       <Text color="white">E: View profile being touched</Text>
-      <Text color="white">C: Connect Nostr</Text>
+      {
+        window.nostr &&
+        <Text color="white">C: Connect Nostr</Text>
+      }
       <Text color="white">O: Occupy position with your nostr profile</Text>
-      <Text color="white">K: Keysend to developer</Text>
+      {
+        window.webln &&
+        <Text color="white">K: Keysend to developer</Text>
+      }
       <Text color="white">I: Show / Hide instructions</Text>
     </Box>
     {
