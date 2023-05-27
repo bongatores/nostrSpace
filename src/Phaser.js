@@ -37,7 +37,9 @@ import {
   signEvent,
   validateEvent,
   verifySignature,
-} from 'nostr-tools'
+} from 'nostr-tools';
+
+
 /**
  * Is touch device?
  */
@@ -56,7 +58,8 @@ let imgUri;
 
 class MainScene extends Scene3D {
   constructor() {
-    super({ key: 'MainScene' })
+    super({ key: 'MainScene' });
+
   }
 
   init() {
@@ -138,17 +141,20 @@ class MainScene extends Scene3D {
   }
 
   async create() {
-    const { lights } = await this.third.warpSpeed('-ground', '-orbitControls')
+    const { lights } = await this.third.warpSpeed('-ground', '-orbitControls','-sky')
     const { hemisphereLight, ambientLight, directionalLight } = lights
     const intensity = 0.65
     hemisphereLight.intensity = intensity
     ambientLight.intensity = intensity
     directionalLight.intensity = intensity
-
-
+    //this.third.physics.setGravity({x: 0, y: 0, z: 0})
+    this.third.physics.setGravity(0,0,0)
     // this.third.physics.debug.enable()
 
-    await this.generateScenario();
+    this.renderer = new THREE.WebGLRenderer();
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+
+    //await this.generateScenario();
 
 
     await this.generatePlayer();
@@ -233,25 +239,31 @@ class MainScene extends Scene3D {
           kinds: [1,29211]
         },
         {
-          '#e': ['2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c'],
-          kinds: [1]
-        }
+          //'#e': ['f412192fdc846952c75058e911d37a7392aa7fd2e727330f4344badc92fb8a22','wss://relay2.nostrchat.io','root'],
+          kinds: [0]
+        },
       ]
     )
     sub.on('event', async data => {
       console.log(data);
-      let subProfileData = await pool.get(relays, {
-        authors: [
-          data.pubkey
-        ],
-        kinds: [0]
-      });
-      console.log(subProfileData)
-      if(!subProfileData){
-        subProfileData = {
-          pubkey: data.pubkey
-        }
+      let subProfileData;
+      if(data.kind === 0){
+        subProfileData = data;
+      } else {
+        subProfileData = await pool.get(relays, {
+         authors: [
+           data.pubkey
+         ],
+         kinds: [0]
+       });
+       console.log(subProfileData)
+       if(!subProfileData){
+         subProfileData = {
+           pubkey: data.pubkey
+         }
+       }
       }
+
       let body = this.profiles[subProfileData.pubkey]
       if(data.tags[2]){
         if(body && (data.tags[2][0] === 'nostr-space-position')){
@@ -260,18 +272,28 @@ class MainScene extends Scene3D {
           const pos = JSON.parse(data.tags[2][1]);
           console.log(pos)
           body.position.set(pos.x,10,pos.z);
-          this.third.physics.add.existing(body);
+          this.third.physics.add.existing(body,{collisionFlags: 2});
           this.profiles[subProfileData.pubkey] = body
         } else if(!body && data.tags[2][0] === 'nostr-space-position'){
           let info = {
-            x: data.tags[2] ? JSON.parse(data.tags[2][1]).x : (getRandomInt(20)-getRandomInt(20)),
-            y: 15,
-            z: data.tags[2] ? JSON.parse(data.tags[2][1]).z :getRandomInt(20)-getRandomInt(20),
+            x: data.tags[2] ? JSON.parse(data.tags[2][1]).x : (getRandomInt(50)-getRandomInt(50)),
+            y: data.tags[2] ? JSON.parse(data.tags[2][1]).y ? JSON.parse(data.tags[2][1]).y : (getRandomInt(50)-getRandomInt(50)) : (getRandomInt(50)-getRandomInt(50)),
+            z: data.tags[2] ? JSON.parse(data.tags[2][1]).z : getRandomInt(50)-getRandomInt(50),
             profile: subProfileData
           }
           console.log(info)
           await this.addProfile(info,false);
         }
+      } else if(data.kind === 0 && subProfileData.content){
+        let info = {
+          x: (getRandomInt(500)-getRandomInt(500)),
+          y: (getRandomInt(500)-getRandomInt(500)),
+          z: getRandomInt(500)-getRandomInt(500),
+          profile: subProfileData
+        }
+        console.log(info)
+        await this.addProfile(info,false);
+        await delay(2000)
       }
 
 
@@ -280,13 +302,16 @@ class MainScene extends Scene3D {
 
       if(data.tags[1]){
         if(body && data.tags[1][0] === 'nostr-space-movement' && subProfileData.pubkey !== this.nostrPubKey){
-          //this.third.destroy(body);
-          console.log(data.tags[1])
-          const pos = JSON.parse(data.tags[1][1]);
-          console.log(pos)
-          body.position.set(pos.x,pos.y,pos.z);
+          this.third.physics.destroy(body);
+          console.log(data.tags[1]);
+          const obj = JSON.parse(data.tags[1][1]);
+          body.position.set(obj.position.x,obj.position.y,obj.position.z);
+          this.third.physics.add.existing(body)
+          body.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
+
+
           //this.third.add.existing(body);
-          //this.players[subProfileData.pubkey] = body
+          this.players[subProfileData.pubkey] = body
         } else if(data.tags[1][0] === 'nostr-space-movement' && subProfileData.pubkey !== this.nostrPubKey){
           console.log(data.tags[1])
           let info = {
@@ -310,20 +335,21 @@ class MainScene extends Scene3D {
 
           const force = 8;
           pos.copy(obj.direction)
-          pos.multiplyScalar(10)
+          pos.multiplyScalar(8);
+          if(obj.velocity){
+            sphere.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
+          }
           sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
 
-          setTimeout(() => {
-            this.third.destroy(sphere);
-          },2000)
+
           sphere.body.on.collision((otherObject, event) => {
             if (otherObject.name !== 'ground')
             if(otherObject.name === this.player.name){
               this.third.physics.destroy(this.player)
-              this.player.position.set(2, 4, -1);
-              this.third.destroy(sphere);
+              this.player.position.set(2, 4, -1)
               this.third.physics.add.existing(this.player)
             }
+            this.third.destroy(sphere);
           })
         }
       }
@@ -343,15 +369,15 @@ class MainScene extends Scene3D {
 
     const raycaster = new THREE.Raycaster()
     const x = 0
-    const y = 0.8
+    const y = 0.1
     const pos = new THREE.Vector3();
 
     raycaster.setFromCamera({ x, y }, this.third.camera);
-
-
+    const velocity = this.player.body.velocity;
     let msgSend = {
       direction: raycaster.ray.direction,
       origin: raycaster.ray.origin,
+      velocity: velocity
     };
     // Shoot
     let event = {
@@ -450,6 +476,8 @@ class MainScene extends Scene3D {
     this.third.add.existing(this.player);
     this.player.body.setFriction(0.8)
     this.player.body.setAngularFactor(0, 0, 0);
+    //this.player.body.setGravity(0, 0, 0);
+
     /**
      * Add 3rd Person Controls
      */
@@ -531,13 +559,12 @@ class MainScene extends Scene3D {
         body.add(sprite3d);
       }
       body.position.set(info.x,info.y,info.z)
-
       this.third.add.existing(body);
-
       if(player){
         this.players[info.profile.pubkey] = body
+        this.third.physics.add.existing(body, {collisionFlags: 1});
       } else {
-        this.third.physics.add.existing(body);
+        this.third.physics.add.existing(body, {collisionFlags: 2});
         this.profiles[info.profile.pubkey] = body
         this.third.physics.add.collider(body, this.player, async event => {
           if(this.keys.e.isDown){
@@ -592,9 +619,16 @@ class MainScene extends Scene3D {
   async setPlayerPos(){
     try{
       const pos = {
-        x: this.player.position.x,
-        y: this.player.position.y,
-        z: this.player.position.z
+        position: {
+          x: this.player.position.x,
+          y: this.player.position.y,
+          z: this.player.position.z
+        },
+        velocity:{
+          x: this.player.body.velocity.x,
+          y: this.player.body.velocity.y,
+          z: this.player.body.velocity.z
+        }
       };
       console.log(pos)
       // Position
@@ -613,13 +647,13 @@ class MainScene extends Scene3D {
       console.log(event)
       let pubs = pool.publish(relays, event)
       pubs.on('ok', (res) => {
-        //this.moving = false;
+        this.moving = false;
         console.log(res);
       });
 
     } catch(err){
       console.log(err)
-      //this.moving = false;
+      this.moving = false;
     }
   }
   async occupyWithImage(){
@@ -693,7 +727,7 @@ class MainScene extends Scene3D {
       /**
        * Player Turn
        */
-      const speed = 4
+      const speed = 1
       const v3 = new THREE.Vector3()
 
       const rotation = this.third.camera.getWorldDirection(v3)
@@ -716,21 +750,27 @@ class MainScene extends Scene3D {
        * Player Move
        */
       if (this.keys.w.isDown || this.move) {
+        const raycaster = new THREE.Raycaster()
+        let x = 0
+        let y = 0
+        let z = 0
+        raycaster.setFromCamera({ x, y }, this.third.camera);
 
+        const pos = new THREE.Vector3();
 
-        const x = Math.sin(theta) * speed,
-          y = this.player.body.velocity.y,
-          z = Math.cos(theta) * speed
+        pos.copy(raycaster.ray.direction)
+        pos.add(raycaster.ray.origin)
+        pos.copy(raycaster.ray.direction)
+        pos.multiplyScalar(3)
 
+        x = pos.x*speed
+        y = pos.y*speed
+        z = pos.z*speed
         this.player.body.setVelocity(x, y, z)
+        //this.setPlayerPos();
+
       }
 
-      /**
-       * Player Jump
-       */
-      if (this.keys.space.isDown && this.canJump) {
-        this.jump()
-      }
 
       if(this.keys.c.isDown && !this.connecting && !this.connected){
         this.connecting = true;
@@ -744,7 +784,7 @@ class MainScene extends Scene3D {
       if(!this.moving && this.connected){
         this.moving = true;
         this.time.addEvent({
-          delay: 1500,
+          delay: 2500,
           callback: () => {
             this.moving = false
           }
@@ -754,7 +794,7 @@ class MainScene extends Scene3D {
       if(this.keys.f.isDown && this.canShoot && this.connected){
         this.canShoot = false;
         this.time.addEvent({
-          delay: 2000,
+          delay: 1000,
           callback: () => {
             this.canShoot = true
           }
@@ -766,11 +806,6 @@ class MainScene extends Scene3D {
       if(window.webln && this.keys.k.isDown && !this.keysending){
         this.keysending = true;
         this.keysend();
-      }
-      if(this.player.position.y < - 10){
-        this.third.physics.destroy(this.player)
-        this.player.position.set(getRandomInt(10)- getRandomInt(20), 10, getRandomInt(10) - getRandomInt(20));
-        this.third.physics.add.existing(this.player);
       }
     }
   }

@@ -41,8 +41,8 @@ export const generateKeys = async () => {
 }
 
 export const relays = [
+  'wss://relay.snort.social',
   'wss://relay.damus.io',
   'wss://relay2.nostrchat.io',
-  'wss://relay.snort.social',
   'wss://nostr-01.bolt.observer'
 ]
