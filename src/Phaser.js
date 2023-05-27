@@ -241,7 +241,7 @@ class MainScene extends Scene3D {
         {
           //'#e': ['f412192fdc846952c75058e911d37a7392aa7fd2e727330f4344badc92fb8a22','wss://relay2.nostrchat.io','root'],
           kinds: [0],
-          limit: 200
+          limit: 50
         },
       ]
     )
