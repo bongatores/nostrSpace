@@ -241,7 +241,7 @@ class MainScene extends Scene3D {
         {
           //'#e': ['f412192fdc846952c75058e911d37a7392aa7fd2e727330f4344badc92fb8a22','wss://relay2.nostrchat.io','root'],
           kinds: [0],
-          limit: 50
+          limit: 150
         },
       ]
     )
@@ -389,7 +389,7 @@ class MainScene extends Scene3D {
         ['t', 'nostr-space'],
         ['nostr-space-shoot',JSON.stringify(msgSend)]
       ],
-      content: `Shoot at position - (${this.player.body.position.x},${this.player.body.position.z})`
+      content: `Shoot at position - (${this.player.body.position.x},${this.player.body.position.y},${this.player.body.position.z})`
     }
     event.id = getEventHash(event)
     event = await this.signEvent(event);
@@ -537,7 +537,8 @@ class MainScene extends Scene3D {
         height: 0.3,
         depth: 0.5
       }, {
-        custom: textureCube.materials
+        custom: textureCube.materials,
+        side: THREE.BackSide
       });
       if(player){
         body = new THREE.Group();
@@ -601,7 +602,7 @@ class MainScene extends Scene3D {
           ['t', 'nostr-space'],
           ['nostr-space-position',JSON.stringify(pos)]
         ],
-        content: `Update to position - (${this.player.body.position.x},${this.player.body.position.z})`
+        content: `Update to position - (${this.player.body.position.x},${this.player.body.position.y},${this.player.body.position.z})`
       }
       event.id = getEventHash(event)
       event = await this.signEvent(event);
@@ -648,13 +649,13 @@ class MainScene extends Scene3D {
       console.log(event)
       let pubs = pool.publish(relays, event)
       pubs.on('ok', (res) => {
-        this.moving = false;
+        //this.moving = false;
         console.log(res);
       });
 
     } catch(err){
       console.log(err)
-      this.moving = false;
+      //this.moving = false;
     }
   }
   async occupyWithImage(){
@@ -673,7 +674,7 @@ class MainScene extends Scene3D {
           ['nostr-space-image-position',JSON.stringify(pos)],
           ['nostr-space-image-url',imgUri]
         ],
-        content: `Nostr Space - Image ${imgUri} - Position - (${this.player.body.position.x},${this.player.body.position.z})`
+        content: `Nostr Space - Image ${imgUri} - Position - (${this.player.body.position.x},${this.player.body.position.y},${this.player.body.position.z})`
       }
       event.id = getEventHash(event)
       event = await this.signEvent(event);
