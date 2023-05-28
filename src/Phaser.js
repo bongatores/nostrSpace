@@ -120,13 +120,13 @@ class MainScene extends Scene3D {
       }
     }
     this.playerProfile = newProfile;
+    this.connecting = false;
+    this.connected = true;
+    this.nostrPubKey = newNostrPubKey;
     if(this.player){
       this.third.destroy(this.player);
       await this.generatePlayer()
     }
-    this.connecting = false;
-    this.connected = true;
-    this.nostrPubKey = newNostrPubKey;
     const imgTab = document.getElementById("addImgTab");
     imgTab.style.display = "flex";
     const nostrInfo = document.getElementById("nostrInfo");
@@ -230,6 +230,14 @@ class MainScene extends Scene3D {
       buttonB.onRelease(() => (this.move = false))
     }
   }
+  respawn(){
+    const base = this.profiles[this.nostrPubKey]
+    if(base){
+      this.player.position.set(base.position.x, base.position.y, base.position.z)
+    } else {
+      this.player.position.set(getRandomInt(50)-getRandomInt(50),getRandomInt(50)-getRandomInt(50),getRandomInt(50)-getRandomInt(50))
+    }
+  }
   async subscribeNostrEvents(){
     let sub = pool.sub(
       relays,
@@ -272,7 +280,7 @@ class MainScene extends Scene3D {
           console.log(data.tags[2])
           const pos = JSON.parse(data.tags[2][1]);
           console.log(pos)
-          body.position.set(pos.x,10,pos.z);
+          body.position.set(pos.x,pos.y ? pos.y : 10,pos.z);
           this.third.physics.add.existing(body,{collisionFlags: 2});
           this.profiles[subProfileData.pubkey] = body
         } else if(!body && data.tags[2][0] === 'nostr-space-position'){
@@ -347,7 +355,7 @@ class MainScene extends Scene3D {
             if (otherObject.name !== 'ground')
             if(otherObject.name === this.player.name){
               this.third.physics.destroy(this.player)
-              this.player.position.set(2, 4, -1)
+              this.respawn();
               this.third.physics.add.existing(this.player)
             }
             this.third.destroy(sphere);
@@ -466,14 +474,14 @@ class MainScene extends Scene3D {
 
     this.player.add(sprite)
     this.player.add(sprite3d);
-    this.player.position.set(getRandomInt(10)- getRandomInt(20), 10, getRandomInt(10) - getRandomInt(20))
     this.player.scale.set(0.25,0.25,0.25);
 
     /**
      * Add the player to the scene with a body
      */
 
-    this.third.physics.add.existing(this.player,{shape:"box"})
+    this.respawn();
+    this.third.physics.add.existing(this.player,{shape:"box"});
     this.third.add.existing(this.player);
     this.player.body.setFriction(0.8)
     this.player.body.setAngularFactor(0, 0, 0);
@@ -509,7 +517,7 @@ class MainScene extends Scene3D {
       }
 
       // create text texture
-      let text = `${metadata.name}`;
+      let text = `${metadata.name}'s base`;
       let texture = new FLAT.TextTexture(`${text}`,{color: "blue"});
       // texture in 3d space
       let sprite3d = new FLAT.TextSprite(texture)
