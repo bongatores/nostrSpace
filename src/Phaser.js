@@ -39,6 +39,7 @@ import {
   verifySignature,
 } from 'nostr-tools';
 
+import {stringToBytes} from 'convert-string';
 
 /**
  * Is touch device?
@@ -235,7 +236,11 @@ class MainScene extends Scene3D {
     if(base){
       this.player.position.set(base.position.x, base.position.y, base.position.z)
     } else {
-      this.player.position.set(getRandomInt(50)-getRandomInt(50),getRandomInt(50)-getRandomInt(50),getRandomInt(50)-getRandomInt(50))
+      this.player.position.set(
+        700 + (getRandomInt(10) - getRandomInt(10)),
+        700 + (getRandomInt(10) - getRandomInt(10)),
+        360 + (getRandomInt(10) - getRandomInt(10))
+      );
     }
   }
   async subscribeNostrEvents(){
@@ -273,7 +278,8 @@ class MainScene extends Scene3D {
        }
       }
 
-      let body = this.profiles[subProfileData.pubkey]
+      let body = this.profiles[subProfileData.pubkey];
+      const bytes = stringToBytes(subProfileData.pubkey);
       if(data.tags[2]){
         if(body && (data.tags[2][0] === 'nostr-space-position')){
           this.third.physics.destroy(body);
@@ -285,24 +291,25 @@ class MainScene extends Scene3D {
           this.profiles[subProfileData.pubkey] = body
         } else if(!body && data.tags[2][0] === 'nostr-space-position'){
           let info = {
-            x: data.tags[2] ? JSON.parse(data.tags[2][1]).x : (getRandomInt(50)-getRandomInt(50)),
-            y: data.tags[2] ? JSON.parse(data.tags[2][1]).y ? JSON.parse(data.tags[2][1]).y : (getRandomInt(50)-getRandomInt(50)) : (getRandomInt(50)-getRandomInt(50)),
-            z: data.tags[2] ? JSON.parse(data.tags[2][1]).z : getRandomInt(50)-getRandomInt(50),
+            x: data.tags[2] ? JSON.parse(data.tags[2][1]).x : bytes[0],
+            y: data.tags[2] ? JSON.parse(data.tags[2][1]).y ? JSON.parse(data.tags[2][1]).y : bytes[1] : bytes[1],
+            z: data.tags[2] ? JSON.parse(data.tags[2][1]).z : bytes[2],
             profile: subProfileData
           }
           console.log(info)
           await this.addProfile(info,false);
         }
       } else if(data.kind === 0 && subProfileData.content){
+
         let info = {
-          x: (getRandomInt(500)-getRandomInt(500)),
-          y: (getRandomInt(500)-getRandomInt(500)),
-          z: getRandomInt(500)-getRandomInt(500),
+          x: bytes[0]*7,
+          y: bytes[3]*7,
+          z: bytes[5]*7,
           profile: subProfileData
         }
         console.log(info)
         await this.addProfile(info,false);
-        await delay(2000)
+        //await delay(2000)
       }
 
 
@@ -363,7 +370,6 @@ class MainScene extends Scene3D {
         }
       }
 
-
       })
   }
   async signEvent(event){
@@ -378,7 +384,7 @@ class MainScene extends Scene3D {
 
     const raycaster = new THREE.Raycaster()
     const x = 0
-    const y = 0.1
+    const y = 0.25
     const pos = new THREE.Vector3();
 
     raycaster.setFromCamera({ x, y }, this.third.camera);
@@ -479,7 +485,7 @@ class MainScene extends Scene3D {
     /**
      * Add the player to the scene with a body
      */
-
+    await delay(1000);
     this.respawn();
     this.third.physics.add.existing(this.player,{shape:"box"});
     this.third.add.existing(this.player);
@@ -597,6 +603,7 @@ class MainScene extends Scene3D {
     try{
       const pos = {
         x: this.player.body.position.x,
+        y: this.player.body.position.y,
         z: this.player.body.position.z
       };
 
