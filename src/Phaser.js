@@ -254,7 +254,7 @@ class MainScene extends Scene3D {
         {
           //'#e': ['f412192fdc846952c75058e911d37a7392aa7fd2e727330f4344badc92fb8a22','wss://relay2.nostrchat.io','root'],
           kinds: [0],
-          limit: 150
+          limit: 250
         },
       ]
     )
@@ -282,18 +282,17 @@ class MainScene extends Scene3D {
       const bytes = stringToBytes(subProfileData.pubkey);
       if(data.tags[2]){
         if(body && (data.tags[2][0] === 'nostr-space-position')){
-          this.third.physics.destroy(body);
           console.log(data.tags[2])
           const pos = JSON.parse(data.tags[2][1]);
           console.log(pos)
-          body.position.set(pos.x,pos.y ? pos.y : 10,pos.z);
-          this.third.physics.add.existing(body,{collisionFlags: 2});
+          body.body.needUpdate = true
+          body.position.set(pos.x,pos.y,pos.z);
           this.profiles[subProfileData.pubkey] = body
         } else if(!body && data.tags[2][0] === 'nostr-space-position'){
           let info = {
-            x: data.tags[2] ? JSON.parse(data.tags[2][1]).x : bytes[0],
-            y: data.tags[2] ? JSON.parse(data.tags[2][1]).y ? JSON.parse(data.tags[2][1]).y : bytes[1] : bytes[1],
-            z: data.tags[2] ? JSON.parse(data.tags[2][1]).z : bytes[2],
+            x: JSON.parse(data.tags[2][1]).x,
+            y: JSON.parse(data.tags[2][1]).y,
+            z: JSON.parse(data.tags[2][1]).z,
             profile: subProfileData
           }
           console.log(info)
@@ -318,14 +317,11 @@ class MainScene extends Scene3D {
 
       if(data.tags[1]){
         if(body && data.tags[1][0] === 'nostr-space-movement' && subProfileData.pubkey !== this.nostrPubKey){
-          this.third.physics.destroy(body);
+          body.body.needUpdate = true
           console.log(data.tags[1]);
           const obj = JSON.parse(data.tags[1][1]);
           body.position.set(obj.position.x,obj.position.y,obj.position.z);
-          this.third.physics.add.existing(body)
           body.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
-
-
           //this.third.add.existing(body);
           this.players[subProfileData.pubkey] = body
         } else if(data.tags[1][0] === 'nostr-space-movement' && subProfileData.pubkey !== this.nostrPubKey){
@@ -369,6 +365,7 @@ class MainScene extends Scene3D {
           })
         }
       }
+
 
       })
   }
@@ -576,11 +573,11 @@ class MainScene extends Scene3D {
       }
       body.position.set(info.x,info.y,info.z)
       this.third.add.existing(body);
+      this.third.physics.add.existing(body, {collisionFlags: 2});
+
       if(player){
         this.players[info.profile.pubkey] = body
-        this.third.physics.add.existing(body, {collisionFlags: 1});
       } else {
-        this.third.physics.add.existing(body, {collisionFlags: 2});
         this.profiles[info.profile.pubkey] = body
         this.third.physics.add.collider(body, this.player, async event => {
           if(this.keys.e.isDown){
