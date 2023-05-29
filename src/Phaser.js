@@ -260,6 +260,10 @@ class MainScene extends Scene3D {
         {
           kinds: [40],
           limit: 20
+        },
+        {
+          kinds: [7],
+          since: Math.floor(Date.now() / 1000)
         }
       ]
     )
@@ -287,25 +291,8 @@ class MainScene extends Scene3D {
       const bytes = stringToBytes(subProfileData.pubkey);
       const bytesEvent = stringToBytes(data.id);
 
-      if(data.tags[2] && data.kind === 1){
-        if(body && (data.tags[2][0] === 'nostr-space-position')){
-          console.log(data.tags[2])
-          const pos = JSON.parse(data.tags[2][1]);
-          console.log(pos)
-          body.body.needUpdate = true
-          body.position.set(pos.x,pos.y,pos.z);
-          this.profiles[subProfileData.pubkey] = body
-        } else if(!body && data.tags[2][0] === 'nostr-space-position'){
-          let info = {
-            x: JSON.parse(data.tags[2][1]).x,
-            y: JSON.parse(data.tags[2][1]).y,
-            z: JSON.parse(data.tags[2][1]).z,
-            profile: subProfileData
-          }
-          console.log(info)
-          await this.addProfile(info,false);
-        }
-      } else if(data.kind === 0 && subProfileData.content){
+
+      if(data.kind === 0 && subProfileData.content){
         let info = {
           x: bytes[0]*7,
           y: bytes[3]*7,
@@ -314,9 +301,74 @@ class MainScene extends Scene3D {
         }
         console.log(info)
         await this.addProfile(info,false);
-        //await delay(2000)
       }
 
+      if(data.kind === 1){
+        if(data.tags[2]){
+          if(body && (data.tags[2][0] === 'nostr-space-position')){
+            console.log(data.tags[2])
+            const pos = JSON.parse(data.tags[2][1]);
+            console.log(pos)
+            body.body.needUpdate = true
+            body.position.set(pos.x,pos.y,pos.z);
+            this.profiles[subProfileData.pubkey] = body
+          } else if(!body && data.tags[2][0] === 'nostr-space-position'){
+            let info = {
+              x: JSON.parse(data.tags[2][1]).x,
+              y: JSON.parse(data.tags[2][1]).y,
+              z: JSON.parse(data.tags[2][1]).z,
+              profile: subProfileData
+            }
+            console.log(info)
+            await this.addProfile(info,false);
+          }
+        }
+      }
+
+      if(data.kind === 7){
+
+        const pos = new THREE.Vector3();
+        const obj = {
+          direction: {
+            x: bytesEvent[0]*2,
+            y: bytesEvent[1]*2,
+            z: bytesEvent[2]*2,
+          },
+          origin: {
+            x: bytesEvent[3]*2,
+            y: bytesEvent[4]*2,
+            z: bytesEvent[5]*2,
+          }
+        }
+        pos.copy(obj.direction)
+        pos.add(obj.origin)
+
+        const sphere = this.third.physics.add.sphere(
+          { radius: 2.50, x: pos.x, y: pos.y, z: pos.z, mass: 10, bufferGeometry: true },
+          { phong: { color: "#FF0000" } }
+        );
+
+        const force = 15;
+        pos.copy(obj.direction)
+        pos.multiplyScalar(8);
+        sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
+
+        this.time.addEvent({
+          delay: 5000,
+          callback: () => {
+            this.third.destroy(sphere)
+          }
+        })
+        sphere.body.on.collision((otherObject, event) => {
+          if (otherObject.name !== 'ground')
+          if(otherObject.name === this.player.name){
+            this.third.physics.destroy(this.player)
+            this.respawn();
+            this.third.physics.add.existing(this.player)
+          }
+          this.third.destroy(sphere);
+        })
+      }
 
       if(data.kind === 40){
 
@@ -340,54 +392,56 @@ class MainScene extends Scene3D {
 
       body = this.players[subProfileData.pubkey]
 
-      if(data.tags[1] && data.kind === 29211){
-        if(body && data.tags[1][0] === 'nostr-space-movement' && subProfileData.pubkey !== this.nostrPubKey){
-          body.body.needUpdate = true
-          console.log(data.tags[1]);
-          const obj = JSON.parse(data.tags[1][1]);
-          body.position.set(obj.position.x,obj.position.y,obj.position.z);
-          body.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
-          //this.third.add.existing(body);
-          this.players[subProfileData.pubkey] = body
-        } else if(data.tags[1][0] === 'nostr-space-movement' && subProfileData.pubkey !== this.nostrPubKey){
-          console.log(data.tags[1])
-          let info = {
-            x: JSON.parse(data.tags[1][1]).x,
-            y: JSON.parse(data.tags[1][1]).y,
-            z: JSON.parse(data.tags[1][1]).z,
-            profile: subProfileData
-          }
-          await this.addProfile(info,true);
-        } else if(data.tags[1][0] === 'nostr-space-shoot'){
-          console.log("Shoooot")
-          const pos = new THREE.Vector3();
-          const obj = JSON.parse(data.tags[1][1]);
-          pos.copy(obj.direction)
-          pos.add(obj.origin)
-
-          const sphere = this.third.physics.add.sphere(
-            { radius: 0.050, x: pos.x, y: pos.y, z: pos.z, mass: 10, bufferGeometry: true },
-            { phong: { color: 0x202020 } }
-          );
-
-          const force = 8;
-          pos.copy(obj.direction)
-          pos.multiplyScalar(8);
-          if(obj.velocity){
-            sphere.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
-          }
-          sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
-
-
-          sphere.body.on.collision((otherObject, event) => {
-            if (otherObject.name !== 'ground')
-            if(otherObject.name === this.player.name){
-              this.third.physics.destroy(this.player)
-              this.respawn();
-              this.third.physics.add.existing(this.player)
+      if(data.kind === 29211){
+        if(data.tags[1]){
+          if(body && data.tags[1][0] === 'nostr-space-movement' && subProfileData.pubkey !== this.nostrPubKey){
+            body.body.needUpdate = true
+            console.log(data.tags[1]);
+            const obj = JSON.parse(data.tags[1][1]);
+            body.position.set(obj.position.x,obj.position.y,obj.position.z);
+            body.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
+            //this.third.add.existing(body);
+            this.players[subProfileData.pubkey] = body
+          } else if(data.tags[1][0] === 'nostr-space-movement' && subProfileData.pubkey !== this.nostrPubKey){
+            console.log(data.tags[1])
+            let info = {
+              x: JSON.parse(data.tags[1][1]).x,
+              y: JSON.parse(data.tags[1][1]).y,
+              z: JSON.parse(data.tags[1][1]).z,
+              profile: subProfileData
             }
-            this.third.destroy(sphere);
-          })
+            await this.addProfile(info,true);
+          } else if(data.tags[1][0] === 'nostr-space-shoot'){
+            console.log("Shoooot")
+            const pos = new THREE.Vector3();
+            const obj = JSON.parse(data.tags[1][1]);
+            pos.copy(obj.direction)
+            pos.add(obj.origin)
+
+            const sphere = this.third.physics.add.sphere(
+              { radius: 0.050, x: pos.x, y: pos.y, z: pos.z, mass: 10, bufferGeometry: true },
+              { phong: { color: 0x202020 } }
+            );
+
+            const force = 8;
+            pos.copy(obj.direction)
+            pos.multiplyScalar(8);
+            if(obj.velocity){
+              sphere.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
+            }
+            sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
+
+
+            sphere.body.on.collision((otherObject, event) => {
+              if (otherObject.name !== 'ground')
+              if(otherObject.name === this.player.name){
+                this.third.physics.destroy(this.player)
+                this.respawn();
+                this.third.physics.add.existing(this.player)
+              }
+              this.third.destroy(sphere);
+            })
+          }
         }
       }
 
