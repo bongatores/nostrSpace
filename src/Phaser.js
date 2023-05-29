@@ -124,10 +124,8 @@ class MainScene extends Scene3D {
     this.connecting = false;
     this.connected = true;
     this.nostrPubKey = newNostrPubKey;
-    if(this.player){
-      this.third.destroy(this.player);
-      await this.generatePlayer()
-    }
+    this.third.destroy(this.player);
+    await this.generatePlayer()
     const imgTab = document.getElementById("addImgTab");
     imgTab.style.display = "flex";
     const nostrInfo = document.getElementById("nostrInfo");
@@ -232,16 +230,19 @@ class MainScene extends Scene3D {
     }
   }
   respawn(){
+    ///this.player.body.setCollisionFlags(2);
+    //this.player.needUpdate = true;
     const base = this.profiles[this.nostrPubKey]
     if(base){
       this.player.position.set(base.position.x, base.position.y, base.position.z)
     } else {
       this.player.position.set(
         700 + (getRandomInt(10) - getRandomInt(10)),
-        700 + (getRandomInt(10) - getRandomInt(10)),
-        360 + (getRandomInt(10) - getRandomInt(10))
+        400 + (getRandomInt(10) - getRandomInt(10)),
+        400 + (getRandomInt(10) - getRandomInt(10))
       );
     }
+
   }
   async subscribeNostrEvents(){
     let sub = pool.sub(
@@ -256,6 +257,10 @@ class MainScene extends Scene3D {
           kinds: [0],
           limit: 250
         },
+        {
+          kinds: [40],
+          limit: 20
+        }
       ]
     )
     sub.on('event', async data => {
@@ -280,7 +285,9 @@ class MainScene extends Scene3D {
 
       let body = this.profiles[subProfileData.pubkey];
       const bytes = stringToBytes(subProfileData.pubkey);
-      if(data.tags[2]){
+      const bytesEvent = stringToBytes(data.id);
+
+      if(data.tags[2] && data.kind === 1){
         if(body && (data.tags[2][0] === 'nostr-space-position')){
           console.log(data.tags[2])
           const pos = JSON.parse(data.tags[2][1]);
@@ -299,7 +306,6 @@ class MainScene extends Scene3D {
           await this.addProfile(info,false);
         }
       } else if(data.kind === 0 && subProfileData.content){
-
         let info = {
           x: bytes[0]*7,
           y: bytes[3]*7,
@@ -312,10 +318,29 @@ class MainScene extends Scene3D {
       }
 
 
+      if(data.kind === 40){
+
+       const pos = {x: bytesEvent[0],y: bytesEvent[4],z: bytesEvent[6]}
+       const sphere = this.third.physics.add.sphere(
+         { radius: 10, x: pos.x*10, y: pos.y*10, z: pos.z*10, mass: 10000000000000, bufferGeometry: true },
+         { phong: { color: 0x202020 } }
+       );
+
+
+       sphere.body.on.collision((otherObject, event) => {
+         if (otherObject.name !== 'ground')
+         if(otherObject.name === this.player.name){
+           this.third.physics.destroy(this.player)
+           this.respawn();
+           this.third.physics.add.existing(this.player)
+         }
+         this.third.destroy(sphere);
+       })
+      }
 
       body = this.players[subProfileData.pubkey]
 
-      if(data.tags[1]){
+      if(data.tags[1] && data.kind === 29211){
         if(body && data.tags[1][0] === 'nostr-space-movement' && subProfileData.pubkey !== this.nostrPubKey){
           body.body.needUpdate = true
           console.log(data.tags[1]);
@@ -483,9 +508,9 @@ class MainScene extends Scene3D {
      * Add the player to the scene with a body
      */
     await delay(1000);
+    this.third.add.existing(this.player);
     this.respawn();
     this.third.physics.add.existing(this.player,{shape:"box"});
-    this.third.add.existing(this.player);
     this.player.body.setFriction(0.8)
     this.player.body.setAngularFactor(0, 0, 0);
     //this.player.body.setGravity(0, 0, 0);
