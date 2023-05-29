@@ -356,7 +356,11 @@ class MainScene extends Scene3D {
         this.time.addEvent({
           delay: 5000,
           callback: () => {
-            this.third.destroy(sphere)
+            try{
+              this.third.destroy(sphere)
+            } catch(err){
+
+            }
           }
         })
         sphere.body.on.collision((otherObject, event) => {
