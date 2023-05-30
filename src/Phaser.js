@@ -317,7 +317,7 @@ class MainScene extends Scene3D {
           profile: subProfileData
         }
         console.log(info)
-        await this.addProfile(info,false);
+        this.addProfile(info,false);
       }
 
       if(data.kind === 1){
@@ -337,7 +337,7 @@ class MainScene extends Scene3D {
               profile: subProfileData
             }
             console.log(info)
-            await this.addProfile(info,false);
+            this.addProfile(info,false);
           }
         }
       }
@@ -433,7 +433,7 @@ class MainScene extends Scene3D {
               z: JSON.parse(data.tags[1][1]).z,
               profile: subProfileData
             }
-            await this.addProfile(info,true);
+            this.addProfile(info,true);
           } else if(data.tags[1][0] === 'nostr-space-shoot'){
             console.log("Shoooot")
             const pos = new THREE.Vector3();
