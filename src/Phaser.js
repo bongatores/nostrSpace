@@ -272,7 +272,7 @@ class MainScene extends Scene3D {
         {
           //'#e': ['f412192fdc846952c75058e911d37a7392aa7fd2e727330f4344badc92fb8a22','wss://relay2.nostrchat.io','root'],
           kinds: [0],
-          limit: 250
+          limit: 450
         },
         {
           kinds: [40],
@@ -375,6 +375,7 @@ class MainScene extends Scene3D {
           callback: () => {
             try{
               this.third.destroy(sphere)
+
             } catch(err){
 
             }
@@ -388,8 +389,10 @@ class MainScene extends Scene3D {
             this.third.physics.add.existing(this.player)
           }
           this.third.destroy(sphere);
+
         })
       }
+
 
       if(data.kind === 40){
 
@@ -407,7 +410,6 @@ class MainScene extends Scene3D {
            this.respawn();
            this.third.physics.add.existing(this.player)
          }
-         this.third.destroy(sphere);
        })
       }
 
@@ -461,6 +463,8 @@ class MainScene extends Scene3D {
                 this.third.physics.add.existing(this.player)
               }
               this.third.destroy(sphere);
+
+
             })
           }
         }
@@ -481,7 +485,7 @@ class MainScene extends Scene3D {
 
     const raycaster = new THREE.Raycaster()
     const x = 0
-    const y = 0.25
+    const y = 0.5
     const pos = new THREE.Vector3();
 
     raycaster.setFromCamera({ x, y }, this.third.camera);
