@@ -232,7 +232,7 @@ class MainScene extends Scene3D {
         this.canShoot = false;
         this.shoot();
         this.time.addEvent({
-          delay: 1000,
+          delay: 2500,
           callback: () => {
             this.canShoot = true;
           }
@@ -485,7 +485,7 @@ class MainScene extends Scene3D {
 
     const raycaster = new THREE.Raycaster()
     const x = 0
-    const y = 0.5
+    const y = 0.3
     const pos = new THREE.Vector3();
 
     raycaster.setFromCamera({ x, y }, this.third.camera);
@@ -906,7 +906,7 @@ class MainScene extends Scene3D {
       if(!this.moving && this.connected){
         this.moving = true;
         this.time.addEvent({
-          delay: 2500,
+          delay: 3000,
           callback: () => {
             this.moving = false
           }
@@ -916,7 +916,7 @@ class MainScene extends Scene3D {
       if(this.keys.f.isDown && this.canShoot && this.connected){
         this.canShoot = false;
         this.time.addEvent({
-          delay: 1000,
+          delay: 2500,
           callback: () => {
             this.canShoot = true
           }
