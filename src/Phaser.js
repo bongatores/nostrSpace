@@ -159,10 +159,21 @@ class MainScene extends Scene3D {
 
     this.setControls();
     this.subscribeNostrEvents();
-
-
+    this.loadSkybox();
   }
+  async loadSkybox(){
+    const loader = new THREE.TextureLoader();
 
+    loader.setCrossOrigin('anonymous')
+    const texture = await loader.load('https://nostr.build/i/b0cbde0984ed4dd80f1c50c215a35a675a2d2b0bcf144d4a977680fd9fc98012.jpg');
+    const material = new THREE.MeshPhongMaterial({ map: texture,side: THREE.BackSide});
+    //const materialArray = [material,material,material,material,material,material];
+    const skyboxGeo = new THREE.SphereGeometry(1000, 1000, 1000);
+    const skybox = new THREE.Mesh(skyboxGeo,material);
+    skybox.position.set(this.player.position.x,this.player.position.y,this.player.position.z)
+    this.third.add.existing(skybox);
+    this.skybox = skybox;
+  }
   setControls(){
     // set initial view to 90 deg theta
     this.controls.theta = 90;
