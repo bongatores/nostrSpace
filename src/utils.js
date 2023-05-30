@@ -45,5 +45,5 @@ export const relays = [
   'wss://relay.snort.social',
   'wss://relay2.nostrchat.io',
   'wss://nostr-01.bolt.observer',
-  'wss://nos.lol'
+  //'wss://nos.lol'
 ]

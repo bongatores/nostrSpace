@@ -683,7 +683,6 @@ class MainScene extends Scene3D {
         y: this.player.position.y,
         z: this.player.position.z
       };
-
       // Occupy
       let event = {
         kind: 1,
@@ -694,7 +693,7 @@ class MainScene extends Scene3D {
           ['t', 'nostr-space'],
           ['nostr-space-position',JSON.stringify(pos)]
         ],
-        content: `Update to position - (${this.player.body.position.x},${this.player.body.position.y},${this.player.body.position.z})`
+        content: `Update to position - (${this.player.position.x},${this.player.position.y},${this.player.position.z})`
       }
       event.id = getEventHash(event)
       event = await this.signEvent(event);
