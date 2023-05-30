@@ -168,7 +168,7 @@ class MainScene extends Scene3D {
     const texture = await loader.load('https://nostr.build/i/b0cbde0984ed4dd80f1c50c215a35a675a2d2b0bcf144d4a977680fd9fc98012.jpg');
     const material = new THREE.MeshPhongMaterial({ map: texture,side: THREE.BackSide});
     //const materialArray = [material,material,material,material,material,material];
-    const skyboxGeo = new THREE.SphereGeometry(1000, 1000, 1000);
+    const skyboxGeo = new THREE.SphereGeometry(1000,1000,1000);
     const skybox = new THREE.Mesh(skyboxGeo,material);
     skybox.position.set(this.player.position.x,this.player.position.y,this.player.position.z)
     this.third.add.existing(skybox);
@@ -224,11 +224,20 @@ class MainScene extends Scene3D {
         this.moveTop = top * 3
         this.moveRight = right * 3
       })
-      const buttonA = joystick.add.button({
-        letter: 'A',
+      const buttonF = joystick.add.button({
+        letter: 'F',
         styles: { right: 35, bottom: 110, size: 80 }
       })
-      buttonA.onClick(() => this.jump())
+      buttonF.onClick(() => {
+        this.canShoot = false;
+        this.shoot();
+        this.time.addEvent({
+          delay: 1000,
+          callback: () => {
+            this.canShoot = true;
+          }
+        })
+      })
       const buttonB = joystick.add.button({
         letter: 'B',
         styles: { right: 110, bottom: 35, size: 80 }
@@ -498,10 +507,11 @@ class MainScene extends Scene3D {
     console.log(event)
     let pubs = pool.publish(relays, event)
     pubs.on('ok', (res) => {
-      this.occuping = false;
+      //this.canShoot = true;
       console.log(res);
     });
     pubs.on('failed', (relay,reason) => {
+      //this.shooting = false;
       console.log(`failed to publish to ${relay} ${reason}`)
     })
   }
@@ -711,6 +721,10 @@ class MainScene extends Scene3D {
       console.log(event)
       let pubs = pool.publish(relays, event)
       pubs.on('ok', (res) => {
+        this.occuping = false;
+        console.log(res);
+      });
+      pubs.on('failed', (res) => {
         this.occuping = false;
         console.log(res);
       });
