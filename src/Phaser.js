@@ -1,7 +1,6 @@
 import {useEffect,useState} from  'react';
 import Phaser from 'phaser';
 import chroma from "chroma-js";
-import 'websocket-polyfill'
 
 import {
   enable3d,
@@ -157,8 +156,6 @@ class MainScene extends Scene3D {
 
 
     await this.generatePlayer();
-
-
 
     this.setControls();
     this.subscribeNostrEvents();
@@ -682,9 +679,9 @@ class MainScene extends Scene3D {
   async occupy(){
     try{
       const pos = {
-        x: this.player.body.position.x,
-        y: this.player.body.position.y,
-        z: this.player.body.position.z
+        x: this.player.position.x,
+        y: this.player.position.y,
+        z: this.player.position.z
       };
 
       // Occupy
@@ -756,8 +753,8 @@ class MainScene extends Scene3D {
   async occupyWithImage(){
     try{
       const pos = {
-        x: this.player.body.position.x,
-        z: this.player.body.position.z
+        x: this.player.position.x,
+        z: this.player.position.z
       };
       let event = {
         kind: 1,
