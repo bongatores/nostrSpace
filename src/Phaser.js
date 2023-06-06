@@ -267,20 +267,20 @@ class MainScene extends Scene3D {
       [
         {
           '#t': ['nostr-space'],
-          kinds: [1,29211]
+          kinds: [12301,29211]
         },
         {
-          //'#e': ['f412192fdc846952c75058e911d37a7392aa7fd2e727330f4344badc92fb8a22','wss://relay2.nostrchat.io','root'],
           kinds: [0],
-          limit: 450
+          limit: 30
         },
         {
           kinds: [40],
-          limit: 20
+          limit: 2
         },
         {
           kinds: [7],
-          since: Math.floor(Date.now() / 1000)
+          since: Math.floor(Date.now() / 1000),
+          limit: 10
         }
       ]
     )
@@ -320,20 +320,20 @@ class MainScene extends Scene3D {
         this.addProfile(info,false);
       }
 
-      if(data.kind === 1){
-        if(data.tags[2]){
-          if(body && (data.tags[2][0] === 'nostr-space-position')){
-            console.log(data.tags[2])
-            const pos = JSON.parse(data.tags[2][1]);
+      if(data.kind === 12301){
+        if(data.tags[1]){
+          if(body && (data.tags[1][0] === 'nostr-space-position')){
+            console.log(data.tags[1])
+            const pos = JSON.parse(data.tags[1][1]);
             console.log(pos)
             body.body.needUpdate = true
             body.position.set(pos.x,pos.y,pos.z);
             this.profiles[subProfileData.pubkey] = body
-          } else if(!body && data.tags[2][0] === 'nostr-space-position'){
+          } else if(!body && data.tags[1][0] === 'nostr-space-position'){
             let info = {
-              x: JSON.parse(data.tags[2][1]).x,
-              y: JSON.parse(data.tags[2][1]).y,
-              z: JSON.parse(data.tags[2][1]).z,
+              x: JSON.parse(data.tags[1][1]).x,
+              y: JSON.parse(data.tags[1][1]).y,
+              z: JSON.parse(data.tags[1][1]).z,
               profile: subProfileData
             }
             console.log(info)
@@ -448,7 +448,7 @@ class MainScene extends Scene3D {
 
             const force = 8;
             pos.copy(obj.direction)
-            pos.multiplyScalar(8);
+            pos.multiplyScalar(48);
             if(obj.velocity){
               sphere.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
             }
@@ -456,7 +456,7 @@ class MainScene extends Scene3D {
 
 
             sphere.body.on.collision((otherObject, event) => {
-              if (otherObject.name !== 'ground')
+
               if(otherObject.name === this.player.name){
                 this.third.physics.destroy(this.player)
                 this.respawn();
@@ -518,25 +518,6 @@ class MainScene extends Scene3D {
       //this.shooting = false;
       console.log(`failed to publish to ${relay} ${reason}`)
     })
-  }
-  async generateScenario(){
-
-      // heightmap from https://medium.com/@travall/procedural-2d-island-generation-noise-functions-13976bddeaf9
-     const heightmap = await this.third.load.texture('/assets/heightmap/heightmap-island.png')
-
-     // Powered by Chroma.js (https://github.com/gka/chroma.js/)
-     const colorScale = chroma
-       .scale(['#003eb2', '#0952c6', '#a49463', '#867645', '#3c6114', '#5a7f32', '#8c8e7b', '#a0a28f'])
-       .domain([0, 0.025, 0.1, 0.2, 0.25, 0.8, 1.3, 1.45, 1.6])
-
-     const mesh = this.third.heightMap.add(heightmap, { colorScale })
-     if (mesh) {
-       // we position, scale, rotate etc. the mesh before adding physics to it
-       mesh.scale.set(5, 5, 1.3)
-       this.third.physics.add.existing(mesh, { mass: 0 })
-     }
-
-
   }
   async generatePlayer(){
     /**
@@ -710,11 +691,10 @@ class MainScene extends Scene3D {
       };
       // Occupy
       let event = {
-        kind: 1,
+        kind: 12301,
         pubkey: this.nostrPubKey,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
-          ['e', '2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c'],
           ['t', 'nostr-space'],
           ['nostr-space-position',JSON.stringify(pos)]
         ],
@@ -785,11 +765,10 @@ class MainScene extends Scene3D {
         z: this.player.position.z
       };
       let event = {
-        kind: 1,
+        kind: 12302,
         pubkey: this.nostrPubKey,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
-          ['e', '2c812fcb755d9051c088d964f725ead5386e5d3257fb38f539dab096c384b72c'],
           ['t', 'nostr-space'],
           ['nostr-space-image-position',JSON.stringify(pos)],
           ['nostr-space-image-url',imgUri]
@@ -800,7 +779,7 @@ class MainScene extends Scene3D {
       event = await this.signEvent(event);
       console.log(event)
       let pubs = pool.publish(relays, event)
-      pubs.on('event', (res) => {
+      pubs.on('ok', (res) => {
         this.occuping = false;
         console.log(res);
       });
