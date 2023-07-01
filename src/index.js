@@ -1,7 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
-import Game3D from './Phaser';
+//import Game from './Phaser';
+import Game3D from './Enable3D';
+
 import reportWebVitals from './reportWebVitals';
 import { Grommet } from 'grommet';
 import {
@@ -16,6 +18,8 @@ ReactDOM.render(
     <Router>
       <Routes>
         <Route path="/" element={<Game3D />} />
+
+
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

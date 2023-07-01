@@ -1,14 +1,18 @@
 # NostrSpace
 
   A 3d space where all places can be yours until someone removes them from you (soon).
-  View nostr profiles in a 3d empty world! Interactions coming soon if possible ...
+  View nostr profiles in a 3d empty world! Interactions coming soon if possible.
+
+  Events that occurs in Nostr (profile creation, channel creation, reactions to a post) generates artfacts in the game. Profiles are bases in the space, channels are black holes, reactions are antimatter particles at fast speed. Users can login with Nostr, occupy space with its profile, fire at other players and move in the space.
+
+  Messages sent to Nostr are identified by their tags and kinds in order to recognize the action done by players (shoot, movement, occupy positions).
 
 ## Technologies
 
   - **React** - constructs the dapp;
   - **Groomet** - react framework to help doing the user interface;
   - **ThreeJS** - renders the 3d world and allows the user to explore it and interact with it;
-  - **Nostr** -  get profiles, allow sending messages that will be used to place information in the world
+  - **Nostr** -  get profiles,get channels, get reactions, allow sending messages that will be used to place information in the world
   - **Alby** - allow login with nostr and bitcoin lightning;
 
 
@@ -17,8 +21,8 @@
 
 #### Controls
   - `WASD` keys: Move
-  - `P` key: Insert data in the current coordinate
-  - `U` key: View profile at iris.to
+  - `O` key: Insert data in the current coordinate
+  - `E` key: View profile at iris.to
 
 # Getting Started with Create React App
 
