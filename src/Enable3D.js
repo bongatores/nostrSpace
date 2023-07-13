@@ -92,7 +92,6 @@ class MainScene extends Scene3D {
     }
     event.id = getEventHash(event)
     event = await this.signEvent(event);
-    console.log(event)
     let pubs = pool.publish(relays, event)
     pubs.on('ok', (res) => {
       console.log(res);
@@ -113,7 +112,6 @@ class MainScene extends Scene3D {
       ],
       kinds: [0]
     });
-    console.log(newProfile)
     if(!newProfile){
       newProfile = {
         pubkey: newNostrPubKey
@@ -286,7 +284,6 @@ class MainScene extends Scene3D {
       ]
     )
     sub.on('event', async data => {
-      console.log(data);
       let subProfileData;
       if(data.kind === 0){
         subProfileData = data;
@@ -297,7 +294,6 @@ class MainScene extends Scene3D {
          ],
          kinds: [0]
        });
-       console.log(subProfileData)
        if(!subProfileData){
          subProfileData = {
            pubkey: data.pubkey
@@ -317,27 +313,24 @@ class MainScene extends Scene3D {
           z: bytes[5]*7,
           profile: subProfileData
         }
-        console.log(info)
         this.addProfile(info,false);
       }
 
       if(data.kind === 12301){
-        if(data.tags[1]){
-          if(body && (data.tags[1][0] === 'nostr-space-position')){
-            console.log(data.tags[1])
-            const pos = JSON.parse(data.tags[1][1]);
-            console.log(pos)
+        const tagPos = data.tags.filter(tag => tag[0] === 'nostr-space-position')
+        if(tagPos){
+          if(body){
+            const pos = JSON.parse(tagPos[0][1]);
             body.body.needUpdate = true
             body.position.set(pos.x,pos.y,pos.z);
             this.profiles[subProfileData.pubkey] = body
-          } else if(!body && data.tags[1][0] === 'nostr-space-position'){
+          } else {
             let info = {
               x: JSON.parse(data.tags[1][1]).x,
               y: JSON.parse(data.tags[1][1]).y,
               z: JSON.parse(data.tags[1][1]).z,
               profile: subProfileData
             }
-            console.log(info)
             this.addProfile(info,false);
           }
         }
@@ -421,17 +414,17 @@ class MainScene extends Scene3D {
       body = this.players[subProfileData.pubkey]
 
       if(data.kind === 29211){
-        if(data.tags[1]){
-          if(body && data.tags[1][0] === 'nostr-space-movement' && subProfileData.pubkey !== this.nostrPubKey){
+        const tagMovement = data.tags.filter(tag => tag[0] === 'nostr-space-movement')
+        const tagShoot = data.tags.filter(tag => tag[0] === 'nostr-space-shoot')
+        if(tagMovement){
+          if(body && subProfileData.pubkey !== this.nostrPubKey){
             body.body.needUpdate = true
-            console.log(data.tags[1]);
-            const obj = JSON.parse(data.tags[1][1]);
+            const obj = JSON.parse(tagMovement[0][1]);
             body.position.set(obj.position.x,obj.position.y,obj.position.z);
             body.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
             //this.third.add.existing(body);
             this.players[subProfileData.pubkey] = body
-          } else if(data.tags[1][0] === 'nostr-space-movement' && subProfileData.pubkey !== this.nostrPubKey){
-            console.log(data.tags[1])
+          } else if(subProfileData.pubkey !== this.nostrPubKey){
             let info = {
               x: JSON.parse(data.tags[1][1]).x,
               y: JSON.parse(data.tags[1][1]).y,
@@ -439,10 +432,10 @@ class MainScene extends Scene3D {
               profile: subProfileData
             }
             this.addProfile(info,true);
-          } else if(data.tags[1][0] === 'nostr-space-shoot'){
+          } else if(tagShoot){
             console.log("Shoooot")
             const pos = new THREE.Vector3();
-            const obj = JSON.parse(data.tags[1][1]);
+            const obj = JSON.parse(tagShoot[0][1]);
             pos.copy(obj.direction)
             pos.add(obj.origin)
 
@@ -513,7 +506,6 @@ class MainScene extends Scene3D {
     }
     event.id = getEventHash(event)
     event = await this.signEvent(event);
-    console.log(event)
     let pubs = pool.publish(relays, event)
     pubs.on('ok', (res) => {
       //this.canShoot = true;
@@ -596,7 +588,6 @@ class MainScene extends Scene3D {
     } catch(err){
       console.log(err);
     }
-    console.log(info.profile)
     if(this.publickeys[info.profile.pubkey] && !player) return;
     this.publickeys[info.profile.pubkey] = true;
     let metadata;
@@ -628,7 +619,6 @@ class MainScene extends Scene3D {
           image = makeBlockie(info.profile.pubkey);
         }
       }
-      console.log(image)
       let textureCube = this.textures[info.profile.pubkey];
       if(!textureCube){
         textureCube = this.third.misc.textureCube([image,image,image,image,image,image])
@@ -709,7 +699,6 @@ class MainScene extends Scene3D {
       }
       event.id = getEventHash(event)
       event = await this.signEvent(event);
-      console.log(event)
       let pubs = pool.publish(relays, event)
       pubs.on('ok', (res) => {
         this.occuping = false;
@@ -739,7 +728,6 @@ class MainScene extends Scene3D {
           z: this.player.body.velocity.z
         }
       };
-      console.log(pos)
       // Position
       let event = {
         kind: 29211,
@@ -753,7 +741,6 @@ class MainScene extends Scene3D {
       }
       event.id = getEventHash(event)
       event = await this.signEvent(event);
-      console.log(event)
       let pubs = pool.publish(relays, event)
       pubs.on('ok', (res) => {
         //this.moving = false;
@@ -784,7 +771,6 @@ class MainScene extends Scene3D {
       }
       event.id = getEventHash(event)
       event = await this.signEvent(event);
-      console.log(event)
       let pubs = pool.publish(relays, event)
       pubs.on('ok', (res) => {
         this.occuping = false;
