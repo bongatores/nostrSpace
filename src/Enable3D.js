@@ -164,7 +164,7 @@ class MainScene extends Scene3D {
     const loader = new THREE.TextureLoader();
 
     loader.setCrossOrigin('anonymous')
-    const texture = await loader.load('https://cdn.nostr.build/i/2143e8a30c39f3b34dd95ff719a15c6da0c3600af61b16167fd3b41d7c0d76d6.jpg');
+    const texture = await loader.load('https://cdn.nostr.build/i/fbfbdd33ee86e3852f0ec8d4fed442063ba6d3dada3fbe25da0b987dd9cdeb10.png');
     const material = new THREE.MeshPhongMaterial({ map: texture,side: THREE.BackSide});
     //const materialArray = [material,material,material,material,material,material];
     const skyboxGeo = new THREE.SphereGeometry(1000,1000,1000);
