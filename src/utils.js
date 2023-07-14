@@ -16,7 +16,12 @@ export const cloudfrontUrl = (utxo) => {
 
 export const connectWallet = async () => {
   if (window.nostr) {
-    return await window.nostr.getPublicKey();
+    const pk = await window.nostr.getPublicKey();
+    const npub = nip19.npubEncode(pk)
+    return({
+      pk: pk,
+      npub: npub
+    })
   } else {
     alert("Oops, it looks like you haven't set up your Nostr key yet. Go to your Alby Account Settings and create or import a Nostr key.")
     return
@@ -25,7 +30,7 @@ export const connectWallet = async () => {
 export const generateKeys = async () => {
 
   let sk = localStorage.getItem('nostr-sk');
-  if(!sk){
+  if(!sk && !window.nostr){
     sk = generatePrivateKey();
   }
   localStorage.setItem('nostr-sk',sk);

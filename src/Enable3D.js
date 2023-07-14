@@ -99,13 +99,14 @@ class MainScene extends Scene3D {
   }
   async connect() {
     let newNostrPubKey;
+    let keys;
     if(window.nostr){
-      newNostrPubKey = await connectWallet();
+      keys = await connectWallet();
     } else {
-      const keys = await generateKeys();
-      newNostrPubKey = keys.pk;
+      keys = await generateKeys();
       this.sk = keys.sk;
     }
+    newNostrPubKey = keys.pk
     let newProfile = await pool.get(relays, {
       authors: [
         newNostrPubKey
@@ -123,11 +124,10 @@ class MainScene extends Scene3D {
     this.nostrPubKey = newNostrPubKey;
     this.third.destroy(this.player);
     await this.generatePlayer()
-    const imgTab = document.getElementById("addImgTab");
-    imgTab.style.display = "flex";
-    const nostrInfo = document.getElementById("nostrInfo");
-    nostrInfo.style.display = "flex";
 
+    document.getElementById("npub").innerHTML = keys?.npub;
+
+    document.getElementById("sk").innerHTML = keys?.sk;
     this.time.addEvent({
       delay: 2000,
       callback: () => {
@@ -164,7 +164,7 @@ class MainScene extends Scene3D {
     const loader = new THREE.TextureLoader();
 
     loader.setCrossOrigin('anonymous')
-    const texture = await loader.load('https://cdn.nostr.build/i/fbfbdd33ee86e3852f0ec8d4fed442063ba6d3dada3fbe25da0b987dd9cdeb10.png');
+    const texture = await loader.load('https://cdn.polyhaven.com/asset_img/primary/kloofendal_misty_morning_puresky.png?height=780');
     const material = new THREE.MeshPhongMaterial({ map: texture,side: THREE.BackSide});
     //const materialArray = [material,material,material,material,material,material];
     const skyboxGeo = new THREE.SphereGeometry(1000,1000,1000);
@@ -999,9 +999,12 @@ const Game3D =  () => {
             />
           </Box>
         </Tab>
-        <Tab title="Nostr Info" id="nostrInfo" style={{display: "none"}}>
+        <Tab title="Nostr Info" id="nostrInfo" >
           <Box pad="medium">
             <Text>Edit your profile at any nostr client</Text>
+            <Text size="small">NostrChat, Iris.to, Snort Social, Yakihone and much more</Text>
+            <Text size="small">Use alby extension for better experience</Text>
+
             <Text>npub</Text>
             <Text id="npub"></Text>
             <Text>sk</Text>
