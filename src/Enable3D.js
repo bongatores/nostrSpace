@@ -1004,6 +1004,7 @@ const Game3D =  () => {
             <Text>Edit your profile at any nostr client</Text>
             <Text size="small">NostrChat, Iris.to, Snort Social, Yakihone and much more</Text>
             <Text size="small">Use alby extension for better experience</Text>
+            <Text size="xsmall">Relays: {relays.toString()}</Text>
 
             <Text>npub</Text>
             <Text id="npub"></Text>
