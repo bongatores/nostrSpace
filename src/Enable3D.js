@@ -821,7 +821,7 @@ class MainScene extends Scene3D {
       /**
        * Player Turn
        */
-      const speed = 1
+      const speed = 0.5
       const v3 = new THREE.Vector3()
 
       const rotation = this.third.camera.getWorldDirection(v3)
@@ -863,6 +863,10 @@ class MainScene extends Scene3D {
         this.player.body.setVelocity(x, y, z)
         //this.setPlayerPos();
 
+      }
+
+      if (this.keys.s.isDown) {
+        this.player.body.setVelocity(0, 0, 0)
       }
 
 
