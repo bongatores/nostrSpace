@@ -972,9 +972,9 @@ const Game3D =  () => {
     >
     <Box pad="medium" className='MainBox'>
       <img className="logo" src={logo} alt="logo" />
-      <Text className='MainText'>Welcome to EmptySpace!</Text>
+      <Text className='MainText'>Welcome to NostrSpace</Text>
       <br></br>
-      <Text className='SubText'>Journey through a unique 3D universe, where every place is up for grabs and remains yours until someone else stakes a claim. EmptySpace is more than just a game, it's a decentralized application (Dapp) offering an exciting, ever-evolving world for you to explore and shape as you please.</Text>
+      <Text className='SubText'>Your Gateway to a 3D Universe! <br></br>Step into a boundless world where you are the master of your own destiny. In NostrSpace, every corner of our expansive 3D universe can be yours... until someone else decides to claim it.</Text>
       <br></br>
       <Tabs>
         <Tab title="Instructions" className='tab'>
