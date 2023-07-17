@@ -989,7 +989,7 @@ const Game3D =  () => {
           <Text>Mouse:  Move camera direction</Text>
           {
             window.nostr &&
-            <Text >O: Occupy position with your nostr profile</Text>
+            <Text><button class="o-btn">O</button>: Occupy position with your nostr profile</Text>
           }
           {
             window.webln &&
