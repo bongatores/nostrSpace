@@ -1,6 +1,7 @@
 import {useEffect,useState} from  'react';
 import Phaser from 'phaser';
 import chroma from "chroma-js";
+import './enable3d.css';
 
 import {
   enable3d,
@@ -39,6 +40,7 @@ import {
 } from 'nostr-tools';
 
 import {stringToBytes} from 'convert-string';
+import logo from './img/empty_space.png';
 
 /**
  * Is touch device?
@@ -968,26 +970,35 @@ const Game3D =  () => {
       pad="xlarge"
       id="instructions"
     >
-    <Box pad="medium">
+    <Box pad="medium" className='MainBox'>
+      <img className="logo" src={logo} alt="logo" />
+      <Text className='MainText'>Welcome to EmptySpace!</Text>
+      <br></br>
+      <Text className='SubText'>Journey through a unique 3D universe, where every place is up for grabs and remains yours until someone else stakes a claim. EmptySpace is more than just a game, it's a decentralized application (Dapp) offering an exciting, ever-evolving world for you to explore and shape as you please.</Text>
+      <br></br>
       <Tabs>
-        <Tab title="Instructions">
-          <Box pad="medium">
-            <Text >Nostr Space Instructions</Text>
-            <Text >W: Move foward</Text>
-            <Text >C: Connect Nostr</Text>
-            <Text >F: Throw sphere (once connected)</Text>
-            <Text >Mouse: Move camera direction</Text>
-            <Text >E: View profile being touched</Text>
-            {
-              window.nostr &&
-              <Text >O: Occupy position with your nostr profile</Text>
-            }
-            {
-              window.webln &&
-              <Text >K: Keysend to developer</Text>
-            }
-            <Text >I: Show / Hide instructions</Text>
-          </Box>
+        <Tab title="Instructions" className='tab'>
+        <Box pad="medium" className='TabArea' direction="row" gap="large">
+        <Box basis="1/2">
+          <Text><button class="o-btn">C</button>&nbsp; &nbsp; &nbsp;Connect Nostr</Text>
+          <Text><button class="o-btn">W</button>&nbsp; &nbsp; &nbsp;Move foward</Text>
+          <Text><button class="o-btn">F</button>&nbsp; &nbsp; &nbsp;Throw sphere</Text>
+          <Text><button class="o-btn">E</button>&nbsp; &nbsp; &nbsp;View profile being touched</Text>
+        </Box>
+        <Box basis="1/2">
+          <Text>Mouse:  Move camera direction</Text>
+          {
+            window.nostr &&
+            <Text >O: Occupy position with your nostr profile</Text>
+          }
+          {
+            window.webln &&
+            <Text >K: Keysend to developer</Text>
+          }
+          <Text><button class="o-btn">I</button>&nbsp; &nbsp; &nbsp;Show/Hide instructions</Text>
+        </Box>
+        </Box>
+
         </Tab>
         <Tab title="Add Image" id="addImgTab" style={{display: "none"}}>
           <Box pad="medium">
@@ -1003,7 +1014,7 @@ const Game3D =  () => {
             />
           </Box>
         </Tab>
-        <Tab title="Nostr Info" id="nostrInfo" >
+        <Tab title="Nostr Info" id="nostrInfo" className='tab'>
           <Box pad="medium">
             <Text>Edit your profile at any nostr client</Text>
             <Text size="small">NostrChat, Iris.to, Snort Social, Yakihone and much more</Text>
