@@ -1,0 +1,87 @@
+#instructions{
+  background: none;
+}
+
+.MainBox{
+  background: #283048ed;
+  border-radius: 10px;
+  color: white;
+}
+
+.head{
+  text-transform: uppercase;
+  text-align: center;
+  font-weight: 600;
+}
+
+.tab{
+  background-color: red;
+}
+
+.MainBox Tabs Tab{
+  background-color: red;
+}
+
+.MainText{
+  text-align: center;
+  font-size: 32px !important;
+}
+
+.SubText{
+  text-align: center;
+}
+
+.logo{
+  width: 200px;
+  display: block;
+  margin: auto;
+}
+
+
+
+/* Keys */
+
+.c-buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  just-content: flex-start;
+  width: 450px;
+  margin: 3rem auto;
+}
+.o-btn {
+  position: relative;
+  margin: 0.5rem 0;
+  width: fit-content;
+  padding: 7px 15px;
+  border: none;
+  background-color: #FFBA57;
+  font-family: monospace;
+  font-size: 1.6rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #222;
+  box-shadow: 
+    inset 0.1em -0.2em 0 4px #FF5857, 
+    inset -0.1em -0.2em 0 4px #FF5857,
+    inset 0.08em -0.18em 0 5px darken(#FF5857, 30%),
+    inset -0.08em -0.18em 0 5px darken(#FF5857, 30%),
+    0 0.25em 0 0.15em rgba(0,0,0,.2);
+  border-radius: 0.8rem;
+  overflow:hidden;
+  transition: all 90ms ease-in-out;
+  
+  &:active {
+    padding: 3px 10px;
+    box-shadow: 
+    inset 0.05em -0.15em 0 4px #FF5857, 
+    inset -0.05em -0.15em 0 4px #FF5857,
+    inset 0.03em -0.13em 0 5px darken(#FF5857, 30%),
+    inset -0.03em -0.13em 0 5px darken(#FF5857, 30%),
+    0 0.25em 0 0.15em rgba(0,0,0,.2);
+    outline: none;
+  }
+  &:focus {
+    outline: none;
+  }
+}
