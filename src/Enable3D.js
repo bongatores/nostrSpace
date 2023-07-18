@@ -993,7 +993,7 @@ const Game3D =  () => {
           }
           {
             window.webln &&
-            <Text >K: Keysend to developer</Text>
+            <Text ><button class="o-btn">K</button>: Keysend to developer</Text>
           }
           <Text><button class="o-btn">I</button>&nbsp; &nbsp; &nbsp;Show/Hide instructions</Text>
         </Box>
