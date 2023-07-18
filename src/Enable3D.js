@@ -166,7 +166,7 @@ class MainScene extends Scene3D {
     const loader = new THREE.TextureLoader();
 
     loader.setCrossOrigin('anonymous')
-    const texture = await loader.load('https://cdn.polyhaven.com/asset_img/primary/kloofendal_misty_morning_puresky.png?height=780');
+    const texture = await loader.load('/img/try7.png');
     const material = new THREE.MeshPhongMaterial({ map: texture,side: THREE.BackSide});
     //const materialArray = [material,material,material,material,material,material];
     const skyboxGeo = new THREE.SphereGeometry(1000,1000,1000);
