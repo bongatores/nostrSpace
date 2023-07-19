@@ -618,7 +618,6 @@ class MainScene extends Scene3D {
     }
     //if(this.publickeys[info.profile.pubkey] && !player) return;
     this.publickeys[info.profile.pubkey] = true;
-    alert(player)
     let metadata;
     try{
       metadata = {
