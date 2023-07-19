@@ -133,17 +133,18 @@ class MainScene extends Scene3D {
     this.connected = true;
     this.nostrPubKey = newNostrPubKey;
     this.third.destroy(this.player);
-    await this.generatePlayer()
-
-    document.getElementById("npub").innerHTML = keys?.npub;
-
-    document.getElementById("sk").innerHTML = keys?.sk;
     this.time.addEvent({
       delay: 2000,
       callback: () => {
         this.sendEnteredGameMsg();
       }
     });
+    await this.generatePlayer()
+
+    //document.getElementById("npub").innerHTML = keys?.npub;
+
+    //document.getElementById("sk").innerHTML = keys?.sk;
+
   }
   async create() {
 
@@ -277,7 +278,12 @@ class MainScene extends Scene3D {
       [
         {
           '#t': ['nostr-space'],
-          kinds: [12301,29211]
+          kinds: [12301]
+        },
+        {
+          '#t': ['nostr-space'],
+          kinds: [29211],
+          since: Math.floor(Date.now() / 1000)
         },
         {
           kinds: [0],
@@ -333,7 +339,7 @@ class MainScene extends Scene3D {
 
       if(data.kind === 12301){
         const tagPos = data.tags.filter(tag => tag[0] === 'nostr-space-position')
-        if(tagPos){
+        if(tagPos !== undefined){
           if(body){
             const pos = JSON.parse(tagPos[0][1]);
             body.body.needUpdate = true
@@ -431,7 +437,7 @@ class MainScene extends Scene3D {
       if(data.kind === 29211){
         const tagMovement = data.tags.filter(tag => tag[0] === 'nostr-space-movement')
         const tagShoot = data.tags.filter(tag => tag[0] === 'nostr-space-shoot')
-        if(tagMovement){
+        if(tagMovement !== undefined){
           if(body && subProfileData.pubkey !== this.nostrPubKey){
             body.body.needUpdate = true
             const obj = JSON.parse(tagMovement[0][1]);
@@ -447,8 +453,8 @@ class MainScene extends Scene3D {
               profile: subProfileData
             }
             this.addProfile(info,true);
-          } else if(tagShoot){
-            console.log("Shoooot")
+          } else if(tagShoot !== undefined){
+            console.log("Shoooot");
             const pos = new THREE.Vector3();
             const obj = JSON.parse(tagShoot[0][1]);
             pos.copy(obj.direction)
@@ -610,8 +616,9 @@ class MainScene extends Scene3D {
     } catch(err){
       console.log(err);
     }
-    if(this.publickeys[info.profile.pubkey] && !player) return;
+    //if(this.publickeys[info.profile.pubkey] && !player) return;
     this.publickeys[info.profile.pubkey] = true;
+    alert(player)
     let metadata;
     try{
       metadata = {

@@ -74,7 +74,7 @@ export const changeRelay = async (newUrl,relay) => {
 }
 export const relays = [
  'wss://offchain.pub',
- 'ws://127.0.0.1:8008', // localhost, test
+ //'ws://127.0.0.1:8008', // localhost, test
  'wss://relay2.nostrchat.io',
  'wss://nostr.fmt.wiz.biz',
  'wss://relay.damus.io',
