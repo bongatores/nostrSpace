@@ -77,6 +77,7 @@ class MainScene extends Scene3D {
     this.publickeys = [];
     this.textures = [];
     this.images = [];
+    this.enemies = [];
     this.maxProfiles = 100;
     this.canShoot = true;
   }
@@ -272,16 +273,20 @@ class MainScene extends Scene3D {
         },
         {
           kinds: [0],
-          limit: 50
+          limit: 10
+        },
+        {
+          kinds: [1],
+          limit: 1,
         },
         {
           kinds: [40],
-          limit: 5
+          limit: 1
         },
         {
           kinds: [7],
           since: Math.floor(Date.now() / 1000),
-          limit: 10
+          limit: 1
         }
       ]
     )
@@ -470,8 +475,10 @@ class MainScene extends Scene3D {
         }
       }
 
-
-      })
+      if(data.kind === 1){
+        this.addEnemy(data.id);
+      }
+    })
   }
   async signEvent(event){
     if(window.nostr){
@@ -680,7 +687,41 @@ class MainScene extends Scene3D {
       console.log(err)
     }
   }
+  async addEnemy(id){
 
+    const pos = new THREE.Vector3();
+    const bytes = stringToBytes(id)
+    const origin = {
+      x: bytes[2],
+      y: bytes[4],
+      z: bytes[6]
+    }
+    pos.copy(this.player.body.position)
+    pos.add(origin);
+
+    const sphere = this.third.physics.add.sphere(
+      { radius: 0.5, x: origin.x, y: origin.y, z: origin.z, mass: 10, bufferGeometry: true },
+      { phong: { color: "green" } }
+    );
+
+    const force = 0.00000001;
+    pos.copy(this.player.body.position)
+    //pos.multiplyScalar(3);
+    sphere.body.applyForce(pos.x, pos.y, pos.z);
+    sphere.name = id
+
+    this.enemies.push(sphere);
+    sphere.body.on.collision((otherObject, event) => {
+
+      if(otherObject.name === this.player.name){
+        this.third.physics.destroy(this.player)
+        this.respawn();
+        this.third.physics.add.existing(this.player)
+      }
+      this.third.destroy(sphere);
+
+    })
+  }
   async occupy(){
     try{
       const pos = {
@@ -754,39 +795,6 @@ class MainScene extends Scene3D {
       //this.moving = false;
     }
   }
-  async occupyWithImage(){
-    try{
-      const pos = {
-        x: this.player.position.x,
-        z: this.player.position.z
-      };
-      let event = {
-        kind: 12302,
-        pubkey: this.nostrPubKey,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [
-          ['t', 'nostr-space'],
-          ['nostr-space-image-position',JSON.stringify(pos)],
-          ['nostr-space-image-url',imgUri]
-        ],
-        content: `Nostr Space - Image ${imgUri} - Position - (${this.player.body.position.x},${this.player.body.position.y},${this.player.body.position.z})`
-      }
-      event.id = getEventHash(event)
-      event = await this.signEvent(event);
-      let pubs = pool.publish(relays, event)
-      pubs.on('ok', (res) => {
-        this.occuping = false;
-        console.log(res);
-      });
-      setTimeout(() => {
-        this.occuping = false;
-      },[1000])
-
-    } catch(err){
-      console.log(err)
-      this.occuping = false;
-    }
-  }
   async keysend(){
     if(!window.webln) return;
     await window.webln.enable();
@@ -801,17 +809,6 @@ class MainScene extends Scene3D {
 
   }
 
-  jump() {
-    if (!this.player || !this.canJump) return
-    this.canJump = false;
-    this.time.addEvent({
-      delay: 1000,
-      callback: () => {
-        this.canJump = true
-      }
-    })
-    this.player.body.applyForceY(6)
-  }
 
   update(time, delta) {
     if (this.player && this.player.body) {
@@ -884,7 +881,7 @@ class MainScene extends Scene3D {
       if(!this.moving && this.connected){
         this.moving = true;
         this.time.addEvent({
-          delay: 3000,
+          delay: 1000,
           callback: () => {
             this.moving = false
           }
@@ -894,7 +891,7 @@ class MainScene extends Scene3D {
       if(this.keys.f.isDown && this.canShoot && this.connected){
         this.canShoot = false;
         this.time.addEvent({
-          delay: 2500,
+          delay: 500,
           callback: () => {
             this.canShoot = true
           }
@@ -907,6 +904,7 @@ class MainScene extends Scene3D {
         this.keysending = true;
         this.keysend();
       }
+
     }
   }
 }
@@ -989,11 +987,11 @@ const Game3D =  () => {
           <Text>Mouse:  Move camera direction</Text>
           {
             window.nostr &&
-            <Text><button class="o-btn">O</button>: Occupy position with your nostr profile</Text>
+            <Text><button class="o-btn">O</button>&nbsp; &nbsp; &nbsp;Occupy position with your nostr profile</Text>
           }
           {
             window.webln &&
-            <Text ><button class="o-btn">K</button>: Keysend to developer</Text>
+            <Text ><button class="o-btn">K</button>&nbsp; &nbsp; &nbsp;Keysend to developer</Text>
           }
           <Text><button class="o-btn">I</button>&nbsp; &nbsp; &nbsp;Show/Hide instructions</Text>
         </Box>
