@@ -1,4 +1,4 @@
-import {nip19, generatePrivateKey, getPublicKey} from 'nostr-tools'
+import {nip19, generatePrivateKey, getPublicKey,relayInit} from 'nostr-tools'
 
 
 export const ordinalsUrl = (utxo) => {
@@ -44,7 +44,34 @@ export const generateKeys = async () => {
     sk: sk
   });
 }
+export const initRelay = async (url) => {
 
+  const relay = relayInit(url)
+  relay.on('connect', () => {
+    console.log(`connected to ${relay.url}`)
+  })
+  relay.on('error', () => {
+    console.log(`failed to connect to ${relay.url}`)
+  })
+
+  await relay.connect()
+  return(relay);
+}
+
+export const changeRelay = async (newUrl,relay) => {
+ await relay.close();
+ const newRelay = relayInit(newUrl)
+ newRelay.on('connect', () => {
+   console.log(`connected to ${relay.url}`)
+ })
+ newRelay.on('error', () => {
+   console.log(`failed to connect to ${relay.url}`)
+ })
+
+ await newRelay.connect()
+ return(newRelay);
+
+}
 export const relays = [
  'wss://offchain.pub',
  'ws://127.0.0.1:8008', // localhost, test

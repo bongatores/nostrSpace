@@ -29,7 +29,14 @@ import {
 
 import makeBlockie from 'ethereum-blockies-base64';
 
-import { getAddressInfo, connectWallet,generateKeys,relays } from './utils';
+import {
+  getAddressInfo,
+  connectWallet,
+  generateKeys,
+  relays,
+  initRelay,
+  changeRelay
+} from './utils';
 import {
   SimplePool,
   nip19,
@@ -264,8 +271,9 @@ class MainScene extends Scene3D {
 
   }
   async subscribeNostrEvents(){
-    let sub = pool.sub(
-      relays,
+    const relay = await initRelay('wss://offchain.pub'); // Default relay
+    this.relay = relay;
+    let sub = relay.sub(
       [
         {
           '#t': ['nostr-space'],
@@ -480,6 +488,11 @@ class MainScene extends Scene3D {
       }
     })
   }
+  async changeRelay(){
+    const newUrl = prompt("Select new relay url");
+    this.relay = await changeRelay(this.relay,newUrl);
+    // Need to remove items
+  }
   async signEvent(event){
     if(window.nostr){
       event = await window.nostr.signEvent(event)
@@ -515,7 +528,7 @@ class MainScene extends Scene3D {
     }
     event.id = getEventHash(event)
     event = await this.signEvent(event);
-    let pubs = pool.publish(relays, event)
+    let pubs = this.relay.publish(event)
     pubs.on('ok', (res) => {
       //this.canShoot = true;
       console.log(res);
@@ -742,7 +755,7 @@ class MainScene extends Scene3D {
       }
       event.id = getEventHash(event)
       event = await this.signEvent(event);
-      let pubs = pool.publish(relays, event)
+      let pubs = this.relay.publish(event)
       pubs.on('ok', (res) => {
         this.occuping = false;
         console.log(res);
@@ -784,7 +797,7 @@ class MainScene extends Scene3D {
       }
       event.id = getEventHash(event)
       event = await this.signEvent(event);
-      let pubs = pool.publish(relays, event)
+      let pubs = this.relay.publish(event)
       pubs.on('ok', (res) => {
         //this.moving = false;
         console.log(res);
