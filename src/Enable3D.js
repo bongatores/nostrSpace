@@ -291,7 +291,14 @@ class MainScene extends Scene3D {
         },
         {
           kinds: [40],
-          limit: 1
+          limit: 1,
+        },
+        {
+          kinds: [42],
+          limit: 1,
+          since: Math.floor(Date.now() / 1000),
+          '#t': ['nostr-space'],
+
         },
         {
           kinds: [7],
@@ -365,7 +372,7 @@ class MainScene extends Scene3D {
       }
 
 
-      if(data.kind === 40){
+      if(data.kind === 40 || data.kind === 42){
 
        this.spawnBlackHole(bytesEvent);
        return;
@@ -757,7 +764,7 @@ class MainScene extends Scene3D {
       { phong: { color: "green" } }
     );
 
-    const force = 0.0001;
+    const force = 0.3;
     pos.copy(this.player.body.position)
     //pos.multiplyScalar(3);
     sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
