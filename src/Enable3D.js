@@ -283,7 +283,6 @@ class MainScene extends Scene3D {
         {
           kinds: [0],
           limit: 1,
-          since: Math.floor(Date.now() / 1000),
         },
         {
           kinds: [1],
@@ -405,7 +404,7 @@ class MainScene extends Scene3D {
     let body = this.players[subProfileData.pubkey];
     const tagMovement = data.tags.filter(tag => tag[0] === 'nostr-space-movement')
     const tagShoot = data.tags.filter(tag => tag[0] === 'nostr-space-shoot')
-    if(tagMovement !== undefined){
+    if(tagMovement.length > 0){
       if(body && subProfileData.pubkey !== this.nostrPubKey){
         body.body.needUpdate = true
         const obj = JSON.parse(tagMovement[0][1]);
@@ -421,39 +420,40 @@ class MainScene extends Scene3D {
           profile: subProfileData
         }
         this.addProfile(info,true);
-      } else if(tagShoot !== undefined){
-        console.log("Shoooot");
-        const pos = new THREE.Vector3();
-        const obj = JSON.parse(tagShoot[0][1]);
-        pos.copy(obj.direction)
-        pos.add(obj.origin)
-
-        const sphere = this.third.physics.add.sphere(
-          { radius: 0.050, x: pos.x, y: pos.y, z: pos.z, mass: 10, bufferGeometry: true },
-          { phong: { color: 0x202020 } }
-        );
-
-        const force = 8;
-        pos.copy(obj.direction)
-        pos.multiplyScalar(48);
-        if(obj.velocity){
-          sphere.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
-        }
-        sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
-
-
-        sphere.body.on.collision((otherObject, event) => {
-
-          if(otherObject.name === this.player.name){
-            this.third.physics.destroy(this.player)
-            this.respawn();
-            this.third.physics.add.existing(this.player)
-          }
-          this.third.destroy(sphere);
-
-
-        })
       }
+    }
+    if(tagShoot.length > 0){
+      console.log("Shoooot");
+      const pos = new THREE.Vector3();
+      const obj = JSON.parse(tagShoot[0][1]);
+      pos.copy(obj.direction)
+      pos.add(obj.origin)
+
+      const sphere = this.third.physics.add.sphere(
+        { radius: 0.050, x: pos.x, y: pos.y, z: pos.z, mass: 10, bufferGeometry: true },
+        { phong: { color: 0x202020 } }
+      );
+
+      const force = 8;
+      pos.copy(obj.direction)
+      pos.multiplyScalar(48);
+      if(obj.velocity){
+        sphere.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
+      }
+      sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
+
+
+      sphere.body.on.collision((otherObject, event) => {
+
+        if(otherObject.name === this.player.name){
+          this.third.physics.destroy(this.player)
+          this.respawn();
+          this.third.physics.add.existing(this.player)
+        }
+        this.third.destroy(sphere);
+
+
+      })
     }
   }
   spawnAntimatter(bytesEvent){
@@ -568,7 +568,7 @@ class MainScene extends Scene3D {
     let pubs = this.relay.publish(event)
     pubs.on('ok', (res) => {
       //this.canShoot = true;
-      console.log(res);
+      //console.log(res);
     });
     pubs.on('failed', (relay,reason) => {
       //this.shooting = false;
@@ -798,7 +798,7 @@ class MainScene extends Scene3D {
       let pubs = this.relay.publish(event)
       pubs.on('ok', (res) => {
         this.occuping = false;
-        console.log(res);
+        //console.log(res);
       });
       pubs.on('failed', (res) => {
         this.occuping = false;
@@ -840,7 +840,7 @@ class MainScene extends Scene3D {
       let pubs = this.relay.publish(event)
       pubs.on('ok', (res) => {
         //this.moving = false;
-        console.log(res);
+        //console.log(res);
       });
 
     } catch(err){
