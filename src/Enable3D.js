@@ -1,6 +1,5 @@
 import {useEffect,useState} from  'react';
 import Phaser from 'phaser';
-import chroma from "chroma-js";
 import './enable3d.css';
 
 import {
@@ -18,8 +17,6 @@ import {
 import {
   Box,
   Text,
-  Modal,
-  ModalHeader,
   TextInput,
   Layer,
   Button,
@@ -30,7 +27,6 @@ import {
 import makeBlockie from 'ethereum-blockies-base64';
 
 import {
-  getAddressInfo,
   connectWallet,
   generateKeys,
   relays,
@@ -42,8 +38,6 @@ import {
   nip19,
   getEventHash,
   signEvent,
-  validateEvent,
-  verifySignature,
 } from 'nostr-tools';
 
 import {stringToBytes} from 'convert-string';
@@ -82,6 +76,7 @@ class MainScene extends Scene3D {
     this.profiles = [];
     this.players = [];
     this.publickeys = [];
+    this.profileData = [];
     this.textures = [];
     this.images = [];
     this.enemies = [];
@@ -287,11 +282,13 @@ class MainScene extends Scene3D {
         },
         {
           kinds: [0],
-          limit: 10
+          limit: 1,
+          since: Math.floor(Date.now() / 1000),
         },
         {
           kinds: [1],
           limit: 1,
+          since: Math.floor(Date.now() / 1000),
         },
         {
           kinds: [40],
@@ -305,29 +302,49 @@ class MainScene extends Scene3D {
       ]
     )
     sub.on('event', async data => {
+
+      // Kind 1: Short Text Notes
+      if(data.kind === 1){
+        this.addEnemy(data.id);
+        return;
+      }
+
       let subProfileData;
+      // Kind 0: Metadata profile
       if(data.kind === 0){
         subProfileData = data;
-      } else {
+        this.profileData[data.pubkey] = subProfileData;
+        // Kind 12301 Replaceable and Kind 29211 Ephemeral (Movements and Shoots)
+        // Getting profile to show it after if needed
+      } else if(this.profileData[data.pubkey] !== undefined){
+        subProfileData = this.profileData[data.pubkey];
+      } else if((data.kind === 12301 || data.kind === 29211)){
+        // Get profile from multiple relays: cant be sure if the connected relay has the profile
         subProfileData = await pool.get(relays, {
          authors: [
            data.pubkey
          ],
          kinds: [0]
        });
-       if(!subProfileData){
-         subProfileData = {
-           pubkey: data.pubkey
-         }
-       }
+       this.profileData[data.pubkey] = subProfileData;
+      }
+      if(subProfileData === undefined || !subProfileData){
+        subProfileData = {
+          pubkey: data.pubkey
+        }
       }
 
-      let body = this.profiles[subProfileData.pubkey];
-      const bytes = stringToBytes(subProfileData.pubkey);
+      if(data.kind === 29211){
+        this.handleEphemeralEvents(data,subProfileData);
+        return;
+      }
+
       const bytesEvent = stringToBytes(data.id);
 
 
       if(data.kind === 0 && subProfileData.content){
+        const bytes = stringToBytes(subProfileData.pubkey);
+
         let info = {
           x: bytes[0]*7,
           y: bytes[3]*7,
@@ -335,69 +352,98 @@ class MainScene extends Scene3D {
           profile: subProfileData
         }
         this.addProfile(info,false);
+        return;
       }
 
       if(data.kind === 12301){
-        const tagPos = data.tags.filter(tag => tag[0] === 'nostr-space-position')
-        if(tagPos !== undefined){
-          if(body){
-            const pos = JSON.parse(tagPos[0][1]);
-            body.body.needUpdate = true
-            body.position.set(pos.x,pos.y,pos.z);
-            this.profiles[subProfileData.pubkey] = body
-          } else {
-            let info = {
-              x: JSON.parse(data.tags[1][1]).x,
-              y: JSON.parse(data.tags[1][1]).y,
-              z: JSON.parse(data.tags[1][1]).z,
-              profile: subProfileData
-            }
-            this.addProfile(info,false);
-          }
-        }
+        this.handleBasePosition(data,subProfileData);
+        return;
       }
 
       if(data.kind === 7){
+        this.spawnAntimatter(bytesEvent);
+        return;
+      }
 
-        const pos = new THREE.Vector3();
-        const obj = {
-          direction: {
-            x: bytesEvent[0]*2,
-            y: bytesEvent[1]*2,
-            z: bytesEvent[2]*2,
-          },
-          origin: {
-            x: bytesEvent[3]*2,
-            y: bytesEvent[4]*2,
-            z: bytesEvent[5]*2,
-          }
+
+      if(data.kind === 40){
+
+       this.spawnBlackHole(bytesEvent);
+       return;
+
+      }
+
+
+    })
+  }
+  handleBasePosition(data,subProfileData){
+    let body = this.profiles[subProfileData.pubkey];
+    if(!body){
+      body = this.players[subProfileData.pubkey]
+    }
+    const tagPos = data.tags.filter(tag => tag[0] === 'nostr-space-position')
+    if(tagPos !== undefined){
+      if(body){
+        const pos = JSON.parse(tagPos[0][1]);
+        body.body.needUpdate = true
+        body.position.set(pos.x,pos.y,pos.z);
+        this.profiles[subProfileData.pubkey] = body
+      } else {
+        let info = {
+          x: JSON.parse(data.tags[1][1]).x,
+          y: JSON.parse(data.tags[1][1]).y,
+          z: JSON.parse(data.tags[1][1]).z,
+          profile: subProfileData
         }
+        this.addProfile(info,false);
+      }
+    }
+  }
+  handleEphemeralEvents(data,subProfileData){
+
+
+    let body = this.players[subProfileData.pubkey];
+    const tagMovement = data.tags.filter(tag => tag[0] === 'nostr-space-movement')
+    const tagShoot = data.tags.filter(tag => tag[0] === 'nostr-space-shoot')
+    if(tagMovement !== undefined){
+      if(body && subProfileData.pubkey !== this.nostrPubKey){
+        body.body.needUpdate = true
+        const obj = JSON.parse(tagMovement[0][1]);
+        body.position.set(obj.position.x,obj.position.y,obj.position.z);
+        body.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
+        //this.third.add.existing(body);
+        this.players[subProfileData.pubkey] = body
+      } else if(subProfileData.pubkey !== this.nostrPubKey){
+        let info = {
+          x: JSON.parse(data.tags[1][1]).x,
+          y: JSON.parse(data.tags[1][1]).y,
+          z: JSON.parse(data.tags[1][1]).z,
+          profile: subProfileData
+        }
+        this.addProfile(info,true);
+      } else if(tagShoot !== undefined){
+        console.log("Shoooot");
+        const pos = new THREE.Vector3();
+        const obj = JSON.parse(tagShoot[0][1]);
         pos.copy(obj.direction)
         pos.add(obj.origin)
 
         const sphere = this.third.physics.add.sphere(
-          { radius: 2.50, x: pos.x, y: pos.y, z: pos.z, mass: 10, bufferGeometry: true },
-          { phong: { color: "#FF0000" } }
+          { radius: 0.050, x: pos.x, y: pos.y, z: pos.z, mass: 10, bufferGeometry: true },
+          { phong: { color: 0x202020 } }
         );
 
-        const force = 15;
+        const force = 8;
         pos.copy(obj.direction)
-        pos.multiplyScalar(8);
+        pos.multiplyScalar(48);
+        if(obj.velocity){
+          sphere.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
+        }
         sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
 
-        this.time.addEvent({
-          delay: 5000,
-          callback: () => {
-            try{
-              this.third.destroy(sphere)
 
-            } catch(err){
-
-            }
-          }
-        })
         sphere.body.on.collision((otherObject, event) => {
-          if (otherObject.name !== 'ground')
+
           if(otherObject.name === this.player.name){
             this.third.physics.destroy(this.player)
             this.respawn();
@@ -405,92 +451,78 @@ class MainScene extends Scene3D {
           }
           this.third.destroy(sphere);
 
+
         })
       }
+    }
+  }
+  spawnAntimatter(bytesEvent){
 
-
-      if(data.kind === 40){
-
-       const pos = {x: bytesEvent[0],y: bytesEvent[4],z: bytesEvent[6]}
-
-
-
-       const sphere = this.third.physics.add.sphere(
-         { radius: 10, x: pos.x*10, y: pos.y*10, z: pos.z*10, mass: 10000000000000, bufferGeometry: true },
-         { phong: { color: 0x202020 } }
-       );
-
-
-       sphere.body.on.collision((otherObject, event) => {
-         if (otherObject.name !== 'ground')
-         if(otherObject.name === this.player.name){
-           this.third.physics.destroy(this.player)
-           this.respawn();
-           this.third.physics.add.existing(this.player)
-         }
-       })
-
+    const pos = new THREE.Vector3();
+    const obj = {
+      direction: {
+        x: bytesEvent[0]*2,
+        y: bytesEvent[1]*2,
+        z: bytesEvent[2]*2,
+      },
+      origin: {
+        x: bytesEvent[3]*2,
+        y: bytesEvent[4]*2,
+        z: bytesEvent[5]*2,
       }
+    }
+    pos.copy(obj.direction)
+    pos.add(obj.origin)
 
-      body = this.players[subProfileData.pubkey]
+    const sphere = this.third.physics.add.sphere(
+      { radius: 2.50, x: pos.x, y: pos.y, z: pos.z, mass: 10, bufferGeometry: true },
+      { phong: { color: "#FF0000" } }
+    );
 
-      if(data.kind === 29211){
-        const tagMovement = data.tags.filter(tag => tag[0] === 'nostr-space-movement')
-        const tagShoot = data.tags.filter(tag => tag[0] === 'nostr-space-shoot')
-        if(tagMovement !== undefined){
-          if(body && subProfileData.pubkey !== this.nostrPubKey){
-            body.body.needUpdate = true
-            const obj = JSON.parse(tagMovement[0][1]);
-            body.position.set(obj.position.x,obj.position.y,obj.position.z);
-            body.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
-            //this.third.add.existing(body);
-            this.players[subProfileData.pubkey] = body
-          } else if(subProfileData.pubkey !== this.nostrPubKey){
-            let info = {
-              x: JSON.parse(data.tags[1][1]).x,
-              y: JSON.parse(data.tags[1][1]).y,
-              z: JSON.parse(data.tags[1][1]).z,
-              profile: subProfileData
-            }
-            this.addProfile(info,true);
-          } else if(tagShoot !== undefined){
-            console.log("Shoooot");
-            const pos = new THREE.Vector3();
-            const obj = JSON.parse(tagShoot[0][1]);
-            pos.copy(obj.direction)
-            pos.add(obj.origin)
+    const force = 15;
+    pos.copy(obj.direction)
+    pos.multiplyScalar(8);
+    sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
 
-            const sphere = this.third.physics.add.sphere(
-              { radius: 0.050, x: pos.x, y: pos.y, z: pos.z, mass: 10, bufferGeometry: true },
-              { phong: { color: 0x202020 } }
-            );
+    this.time.addEvent({
+      delay: 5000,
+      callback: () => {
+        try{
+          this.third.destroy(sphere)
 
-            const force = 8;
-            pos.copy(obj.direction)
-            pos.multiplyScalar(48);
-            if(obj.velocity){
-              sphere.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
-            }
-            sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
+        } catch(err){
 
-
-            sphere.body.on.collision((otherObject, event) => {
-
-              if(otherObject.name === this.player.name){
-                this.third.physics.destroy(this.player)
-                this.respawn();
-                this.third.physics.add.existing(this.player)
-              }
-              this.third.destroy(sphere);
-
-
-            })
-          }
         }
       }
+    })
+    sphere.body.on.collision((otherObject, event) => {
+      if (otherObject.name !== 'ground')
+      if(otherObject.name === this.player.name){
+        this.third.physics.destroy(this.player)
+        this.respawn();
+        this.third.physics.add.existing(this.player)
+      }
+      this.third.destroy(sphere);
 
-      if(data.kind === 1){
-        this.addEnemy(data.id);
+    })
+  }
+  spawnBlackHole(bytesEvent){
+    const pos = {x: bytesEvent[0],y: bytesEvent[4],z: bytesEvent[6]}
+
+
+
+    const sphere = this.third.physics.add.sphere(
+      { radius: 10, x: pos.x*10, y: pos.y*10, z: pos.z*10, mass: 10000000000000, bufferGeometry: true },
+      { phong: { color: 0x202020 } }
+    );
+
+
+    sphere.body.on.collision((otherObject, event) => {
+      if (otherObject.name !== 'ground')
+      if(otherObject.name === this.player.name){
+        this.third.physics.destroy(this.player)
+        this.respawn();
+        this.third.physics.add.existing(this.player)
       }
     })
   }
@@ -512,7 +544,6 @@ class MainScene extends Scene3D {
     const raycaster = new THREE.Raycaster()
     const x = 0
     const y = 0.3
-    const pos = new THREE.Vector3();
 
     raycaster.setFromCamera({ x, y }, this.third.camera);
     const velocity = this.player.body.velocity;
@@ -616,7 +647,7 @@ class MainScene extends Scene3D {
     } catch(err){
       console.log(err);
     }
-    //if(this.publickeys[info.profile.pubkey] && !player) return;
+    if(this.publickeys[info.profile.pubkey] && !player) return;
     this.publickeys[info.profile.pubkey] = true;
     let metadata;
     try{
@@ -631,6 +662,9 @@ class MainScene extends Scene3D {
 
       // create text texture
       let text = `${metadata.name}'s base`;
+      if(player){
+        text = metadata.name;
+      }
       let texture = new FLAT.TextTexture(`${text}`,{color: "blue"});
       // texture in 3d space
       let sprite3d = new FLAT.TextSprite(texture)
@@ -723,10 +757,10 @@ class MainScene extends Scene3D {
       { phong: { color: "green" } }
     );
 
-    const force = 0.00000001;
+    const force = 0.0001;
     pos.copy(this.player.body.position)
     //pos.multiplyScalar(3);
-    sphere.body.applyForce(pos.x, pos.y, pos.z);
+    sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
     sphere.name = id
 
     this.enemies.push(sphere);
@@ -817,7 +851,7 @@ class MainScene extends Scene3D {
   async keysend(){
     if(!window.webln) return;
     await window.webln.enable();
-    const result = await window.webln.keysend({
+    await window.webln.keysend({
         destination: "03c9e422da6b3c9a29d65f2c91ff73c36c93d645ce91e125a7a20e1758b42cc309",
         amount: "10",
         customRecords: {
@@ -900,7 +934,7 @@ class MainScene extends Scene3D {
       if(!this.moving && this.connected){
         this.moving = true;
         this.time.addEvent({
-          delay: 1000,
+          delay: 1500,
           callback: () => {
             this.moving = false
           }
@@ -910,7 +944,7 @@ class MainScene extends Scene3D {
       if(this.keys.f.isDown && this.canShoot && this.connected){
         this.canShoot = false;
         this.time.addEvent({
-          delay: 500,
+          delay: 1000,
           callback: () => {
             this.canShoot = true
           }
@@ -945,8 +979,6 @@ const config = {
 
 const Game3D =  () => {
 
-  const [show, setShow] = useState();
-  const [value,setValue] = useState();
   const [init,setInit] = useState();
 
   const keyDownHandler = event => {
