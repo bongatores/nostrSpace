@@ -858,13 +858,7 @@ class MainScene extends Scene3D {
   async keysend(){
     if(!window.webln) return;
     await window.webln.enable();
-    await window.webln.keysend({
-        destination: "03c9e422da6b3c9a29d65f2c91ff73c36c93d645ce91e125a7a20e1758b42cc309",
-        amount: "10",
-        customRecords: {
-            "message": "Nostr Space Donation!"
-        }
-    });
+    await window.webln.lnurl("lnurl1dp68gurn8ghj7ampd3kx2ar0veekzar0wd5xjtnrdakj7tnhv4kxctttdehhwm30d3h82unvwqhhqatjwpkx2arjda6hgwpk6dleua");
     this.keysending = false;
 
   }
