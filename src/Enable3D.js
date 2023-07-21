@@ -170,7 +170,7 @@ class MainScene extends Scene3D {
     const loader = new THREE.TextureLoader();
 
     loader.setCrossOrigin('anonymous')
-    const texture = await loader.load('/img/try7.png');
+    const texture = await loader.load('https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/table_mountain_1_puresky.jpg');
     const material = new THREE.MeshPhongMaterial({ map: texture,side: THREE.BackSide});
     //const materialArray = [material,material,material,material,material,material];
     const skyboxGeo = new THREE.SphereGeometry(1000,1000,1000);
