@@ -135,7 +135,9 @@ class MainScene extends Scene3D {
       }
     });
     await this.generatePlayer()
-
+    // add red dot
+    this.redDot = this.add.circle(this.cameras.main.width / 2 , this.cameras.main.height / 2 - 120, 2, 0xff0000)
+    this.redDot.depth = 1
     //document.getElementById("npub").innerHTML = keys?.npub;
 
     //document.getElementById("sk").innerHTML = keys?.sk;
@@ -708,6 +710,15 @@ class MainScene extends Scene3D {
 
       if(player){
         body = new THREE.Group();
+        const target = this.third.add.box({
+          width: 0.25,
+          height: 0.15,
+          depth: 0.25
+        }, {
+          custom: textureCube.materials,
+          side: THREE.BackSide
+        });
+        body.add(target)
       }
       const material = new THREE.SpriteMaterial( { map: image } );
       const sprite = new THREE.Sprite( material );
