@@ -267,9 +267,10 @@ class MainScene extends Scene3D {
 
   }
   async subscribeNostrEvents(){
-    const relay = await initRelay('wss://offchain.pub'); // Default relay
-    this.relay = relay;
-    let sub = relay.sub(
+    const relayOffChain = await initRelay('wss://offchain.pub'); // Default relay
+    const relayNostrChat = await initRelay('wss://relay2.nostrchat.io') // to get more data
+    this.relay = relayOffChain;
+    let subOffChain = relayOffChain.sub(
       [
         {
           '#t': ['nostr-space'],
@@ -281,24 +282,21 @@ class MainScene extends Scene3D {
           since: Math.floor(Date.now() / 1000)
         },
         {
-          kinds: [0],
-          limit: 1,
-        },
-        {
           kinds: [1],
           limit: 1,
           since: Math.floor(Date.now() / 1000),
+        }
+      ]
+    );
+    let subNostrChat = relayNostrChat.sub(
+      [
+        {
+          kinds: [0],
+          limit: 100,
         },
         {
           kinds: [40],
-          limit: 1,
-        },
-        {
-          kinds: [42],
-          limit: 1,
-          since: Math.floor(Date.now() / 1000),
-          '#t': ['nostr-space'],
-
+          limit: 10,
         },
         {
           kinds: [7],
@@ -307,80 +305,84 @@ class MainScene extends Scene3D {
         }
       ]
     )
-    sub.on('event', async data => {
+    subOffChain.on('event', async data => {
+      this.handleEventsEmited(data);
+    });
 
-      // Kind 1: Short Text Notes
-      if(data.kind === 1){
-        this.addEnemy(data.id);
-        return;
-      }
-
-      let subProfileData;
-      // Kind 0: Metadata profile
-      if(data.kind === 0){
-        subProfileData = data;
-        this.profileData[data.pubkey] = subProfileData;
-        // Kind 12301 Replaceable and Kind 29211 Ephemeral (Movements and Shoots)
-        // Getting profile to show it after if needed
-      } else if(this.profileData[data.pubkey] !== undefined){
-        subProfileData = this.profileData[data.pubkey];
-      } else if((data.kind === 12301 || data.kind === 29211)){
-        // Get profile from multiple relays: cant be sure if the connected relay has the profile
-        subProfileData = await pool.get(relays, {
-         authors: [
-           data.pubkey
-         ],
-         kinds: [0]
-       });
-       this.profileData[data.pubkey] = subProfileData;
-      }
-      if(subProfileData === undefined || !subProfileData){
-        subProfileData = {
-          pubkey: data.pubkey
-        }
-      }
-
-      if(data.kind === 29211){
-        this.handleEphemeralEvents(data,subProfileData);
-        return;
-      }
-
-      const bytesEvent = stringToBytes(data.id);
-
-
-      if(data.kind === 0 && subProfileData.content){
-        const bytes = stringToBytes(subProfileData.pubkey);
-
-        let info = {
-          x: bytes[0]*7,
-          y: bytes[3]*7,
-          z: bytes[5]*7,
-          profile: subProfileData
-        }
-        this.addProfile(info,false);
-        return;
-      }
-
-      if(data.kind === 12301){
-        this.handleBasePosition(data,subProfileData);
-        return;
-      }
-
-      if(data.kind === 7){
-        this.spawnAntimatter(bytesEvent);
-        return;
-      }
-
-
-      if(data.kind === 40 || data.kind === 42){
-
-       this.spawnBlackHole(bytesEvent);
-       return;
-
-      }
-
-
+    subNostrChat.on('event', async data => {
+      this.handleEventsEmited(data);
     })
+  }
+  async handleEventsEmited(data){
+    // Kind 1: Short Text Notes
+    if(data.kind === 1){
+      this.addEnemy(data.id);
+      return;
+    }
+
+    let subProfileData;
+    // Kind 0: Metadata profile
+    if(data.kind === 0){
+      subProfileData = data;
+      this.profileData[data.pubkey] = subProfileData;
+      // Kind 12301 Replaceable and Kind 29211 Ephemeral (Movements and Shoots)
+      // Getting profile to show it after if needed
+    } else if(this.profileData[data.pubkey] !== undefined){
+      subProfileData = this.profileData[data.pubkey];
+    } else if((data.kind === 12301 || data.kind === 29211)){
+      // Get profile from multiple relays: cant be sure if the connected relay has the profile
+      subProfileData = await pool.get(relays, {
+       authors: [
+         data.pubkey
+       ],
+       kinds: [0]
+     });
+     this.profileData[data.pubkey] = subProfileData;
+    }
+    if(subProfileData === undefined || !subProfileData){
+      subProfileData = {
+        pubkey: data.pubkey
+      }
+    }
+
+    if(data.kind === 29211){
+      this.handleEphemeralEvents(data,subProfileData);
+      return;
+    }
+
+    const bytesEvent = stringToBytes(data.id);
+
+
+    if(data.kind === 0 && subProfileData.content){
+      const bytes = stringToBytes(subProfileData.pubkey);
+
+      let info = {
+        x: bytes[0]*7,
+        y: bytes[3]*7,
+        z: bytes[5]*7,
+        profile: subProfileData
+      }
+      this.addProfile(info,false);
+      return;
+    }
+
+    if(data.kind === 12301){
+      this.handleBasePosition(data,subProfileData);
+      return;
+    }
+
+    if(data.kind === 7){
+      this.spawnAntimatter(bytesEvent);
+      return;
+    }
+
+
+    if(data.kind === 40 || data.kind === 42){
+
+     this.spawnBlackHole(bytesEvent);
+     return;
+
+    }
   }
   handleBasePosition(data,subProfileData){
     let body = this.profiles[subProfileData.pubkey];
@@ -764,7 +766,7 @@ class MainScene extends Scene3D {
       { phong: { color: "green" } }
     );
 
-    const force = 0.3;
+    const force = 0.8;
     pos.copy(this.player.body.position)
     //pos.multiplyScalar(3);
     sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
@@ -874,7 +876,7 @@ class MainScene extends Scene3D {
       /**
        * Player Turn
        */
-      const speed = 0.5
+      const speed = 1.5
       const v3 = new THREE.Vector3()
 
       const rotation = this.third.camera.getWorldDirection(v3)
