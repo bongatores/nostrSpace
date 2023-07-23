@@ -172,10 +172,10 @@ class MainScene extends Scene3D {
     const loader = new THREE.TextureLoader();
 
     loader.setCrossOrigin('anonymous')
-    const texture = await loader.load('https://cdn.polyhaven.com/asset_img/primary/scythian_tombs_2.png?height=780');
+    const texture = await loader.load('/img/hubble.jpg');
     const material = new THREE.MeshPhongMaterial({ map: texture,side: THREE.BackSide});
     //const materialArray = [material,material,material,material,material,material];
-    const skyboxGeo = new THREE.SphereGeometry(1000,1000,1000);
+    const skyboxGeo = new THREE.SphereGeometry(1000,200,1000);
     const skybox = new THREE.Mesh(skyboxGeo,material);
     skybox.position.set(this.player.position.x,this.player.position.y,this.player.position.z)
     this.third.add.existing(skybox);
