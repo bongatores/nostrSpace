@@ -172,7 +172,7 @@ class MainScene extends Scene3D {
     const loader = new THREE.TextureLoader();
 
     loader.setCrossOrigin('anonymous')
-    const texture = await loader.load('/img/hubble.jpg');
+    const texture = await loader.load('/img/space.png');
     const material = new THREE.MeshPhongMaterial({ map: texture,side: THREE.BackSide});
     //const materialArray = [material,material,material,material,material,material];
     const skyboxGeo = new THREE.SphereGeometry(1000,200,1000);
