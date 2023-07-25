@@ -887,7 +887,7 @@ class MainScene extends Scene3D {
       /**
        * Player Turn
        */
-      const speed = 1.5
+      const speed = 0.8
       const v3 = new THREE.Vector3()
 
       const rotation = this.third.camera.getWorldDirection(v3)
@@ -948,7 +948,7 @@ class MainScene extends Scene3D {
       if(!this.moving && this.connected){
         this.moving = true;
         this.time.addEvent({
-          delay: 1500,
+          delay: 600,
           callback: () => {
             this.moving = false
           }
@@ -1045,20 +1045,22 @@ const Game3D =  () => {
         <Box basis="1/2">
           <Text><button class="o-btn">C</button>&nbsp; &nbsp; &nbsp;Connect Nostr</Text>
           <Text><button class="o-btn">W</button>&nbsp; &nbsp; &nbsp;Move foward</Text>
-          <Text><button class="o-btn">F</button>&nbsp; &nbsp; &nbsp;Throw sphere</Text>
-          <Text><button class="o-btn">E</button>&nbsp; &nbsp; &nbsp;View profile being touched</Text>
+          <Text><button class="o-btn">S</button>&nbsp; &nbsp; &nbsp;Stop</Text>
+          <Text><button class="o-btn">F</button>&nbsp; &nbsp; &nbsp;Shoot</Text>
         </Box>
         <Box basis="1/2">
           <Text>Mouse:  Move camera direction</Text>
           {
             window.nostr &&
-            <Text><button class="o-btn">O</button>&nbsp; &nbsp; &nbsp;Occupy position with your nostr profile</Text>
+            <Text><button class="o-btn">O</button>&nbsp; &nbsp; &nbsp;Occupy position</Text>
           }
           {
             window.webln &&
-            <Text ><button class="o-btn">K</button>&nbsp; &nbsp; &nbsp;Keysend to developer</Text>
+            <Text ><button class="o-btn">K</button>&nbsp; &nbsp; &nbsp;Send SATs to devs</Text>
           }
-          <Text><button class="o-btn">I</button>&nbsp; &nbsp; &nbsp;Show/Hide instructions</Text>
+          <Text><button class="o-btn">I</button>&nbsp; &nbsp; &nbsp;Instructions</Text>
+          <Text><button class="o-btn">E</button>&nbsp; &nbsp; &nbsp;View profile</Text>
+
         </Box>
         </Box>
 
