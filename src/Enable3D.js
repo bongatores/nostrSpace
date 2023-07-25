@@ -844,6 +844,7 @@ class MainScene extends Scene3D {
           z: this.player.body.velocity.z
         }
       };
+      alert(pos.velocity.x)
       // Position
       let event = {
         kind: 29211,
@@ -940,7 +941,7 @@ class MainScene extends Scene3D {
         this.connecting = true;
         this.connect();
       }
-      if(window.nostr && this.keys.o.isDown && !this.occuping && this.connected){
+      if(this.keys.o.isDown && !this.occuping && this.connected){
         this.occuping = true;
         this.occupy();
       }
