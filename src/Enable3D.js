@@ -844,7 +844,6 @@ class MainScene extends Scene3D {
           z: this.player.body.velocity.z
         }
       };
-      alert(pos.velocity.x)
       // Position
       let event = {
         kind: 29211,
