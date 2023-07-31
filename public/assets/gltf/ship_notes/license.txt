@@ -1,0 +1,11 @@
+Model Information:
+* title:	Space ship
+* source:	https://sketchfab.com/3d-models/space-ship-02b37fbbcdab4062ba77fd53c3eb6aaa
+* author:	ElliotKing (https://sketchfab.com/ElliotKing)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Space ship" (https://sketchfab.com/3d-models/space-ship-02b37fbbcdab4062ba77fd53c3eb6aaa) by ElliotKing (https://sketchfab.com/ElliotKing) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

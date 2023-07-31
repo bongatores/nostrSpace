@@ -153,7 +153,6 @@ class MainScene extends Scene3D {
     directionalLight.intensity = intensity
     //this.third.physics.setGravity({x: 0, y: 0, z: 0})
     this.third.physics.setGravity(0,0,0)
-    // this.third.physics.debug.enable()
 
 
     this.renderer = new THREE.WebGLRenderer();
@@ -163,11 +162,13 @@ class MainScene extends Scene3D {
 
 
     await this.generatePlayer();
-
     this.setControls();
     this.subscribeNostrEvents();
     this.loadSkybox();
+    //this.third.physics.debug.enable()
+
   }
+
   async loadSkybox(){
     const loader = new THREE.TextureLoader();
 
@@ -420,8 +421,10 @@ class MainScene extends Scene3D {
         body.body.needUpdate = true
         const obj = JSON.parse(tagMovement[0][1]);
         body.position.set(obj.position.x,obj.position.y,obj.position.z);
+        body.body.setCollisionFlags(1)
         body.body.setVelocity(obj.velocity.x,obj.velocity.y,obj.velocity.z);
         //this.third.add.existing(body);
+        body.body.setCollisionFlags(2)
         this.players[subProfileData.pubkey] = body
       } else if(subProfileData.pubkey !== this.nostrPubKey){
         let info = {
@@ -523,7 +526,7 @@ class MainScene extends Scene3D {
 
 
     const sphere = this.third.physics.add.sphere(
-      { radius: 10, x: pos.x*10, y: pos.y*10, z: pos.z*10, mass: 10000000000000, bufferGeometry: true },
+      { radius: 15, x: pos.x*10, y: pos.y*10, z: pos.z*10, mass: 10000000000000, bufferGeometry: true },
       { phong: { color: 0x202020 } }
     );
 
@@ -605,7 +608,7 @@ class MainScene extends Scene3D {
     // texture in 3d space
     const sprite3d = new FLAT.TextSprite(texture)
     sprite3d.setScale(0.003)
-    this.player = new THREE.Group();
+    this.player = new ExtendedObject3D();
     this.player.name = playerName
     let playerImg
     if(!this.playerProfile){
@@ -623,7 +626,18 @@ class MainScene extends Scene3D {
     }
     const material = new THREE.SpriteMaterial( { map: playerImg } );
     const sprite = new THREE.Sprite( material );
-
+    let object = this.shipObj;
+    if(!object){
+      object = await this.third.load.gltf('/assets/gltf/ship/scene.gltf');
+      this.shipObj = object;
+    }
+    object.scene.scale.set(0.005,0.005,0.005)
+    object.scene.position.y = -1;
+    if(!this.connected){
+      object.scene.rotateY(Math.PI + 0.1) // a hack
+    }
+    this.player.add(object.scene.clone())
+    this.player.scale.set(0.01,0.01,0.01)
     sprite.position.y = 0.2;
     sprite3d.position.y = 0.8;
     this.player.rotateY(Math.PI + 0.1) // a hack
@@ -679,8 +693,8 @@ class MainScene extends Scene3D {
       let texture = new FLAT.TextTexture(`${text}`,{color: "blue"});
       // texture in 3d space
       let sprite3d = new FLAT.TextSprite(texture)
-      sprite3d.position.y = 1.2;
-      sprite3d.setScale(0.0025);
+      sprite3d.position.y = player ? 0.4 : 3.2;
+      sprite3d.setScale(0.0015);
       let image = this.images[info.profile.pubkey];
       if(!image){
         const loader = new THREE.TextureLoader();
@@ -698,32 +712,33 @@ class MainScene extends Scene3D {
         this.textures[info.profile.pubkey] = textureCube;
       }
 
+      let body = new ExtendedObject3D();
 
-      let body = this.third.add.box({
-        width: 0.5,
-        height: 0.3,
-        depth: 0.5
-      }, {
-        custom: textureCube.materials,
-        side: THREE.BackSide
-      });
 
       if(player){
-        body = new THREE.Group();
-        const target = this.third.add.box({
-          width: 0.25,
-          height: 0.15,
-          depth: 0.25
-        }, {
-          custom: textureCube.materials,
-          side: THREE.BackSide
-        });
+
+        let object = this.shipObj;
+        if(!object){
+          object = await this.third.load.gltf('/assets/gltf/ship/scene.gltf');
+          this.shipObj = object;
+        }
+        const target = object.scene.clone();
+        target.scale.set(0.0015,0.0015,0.0015)
+        target.position.y = -0.4
         body.add(target)
+      } else {
+        let object = this.station;
+        if(!object){
+          object = await this.third.load.gltf('/assets/gltf/station/scene.gltf');
+          this.station = object;
+        }
+        body.add(object.scene.clone());
       }
       const material = new THREE.SpriteMaterial( { map: image } );
       const sprite = new THREE.Sprite( material );
-      sprite.position.y = 0.5
-      sprite.scale.set(0.5,0.5,0.5)
+      sprite.position.y = player ? 0.05 : 2.6
+      const scaleSprite = player ? 0.25 : 0.5
+      sprite.scale.set(scaleSprite,scaleSprite,scaleSprite)
       body.add(sprite3d);
       body.add(sprite);
       if(metadata.description && !player){
@@ -732,13 +747,13 @@ class MainScene extends Scene3D {
 
         // texture in 3d space
         sprite3d = new FLAT.TextSprite(texture)
-        sprite3d.position.y = 0.8;
+        sprite3d.position.y = 2.8;
         sprite3d.setScale(0.001);
         body.add(sprite3d);
       }
       body.position.set(info.x,info.y,info.z)
       this.third.add.existing(body);
-      this.third.physics.add.existing(body, {collisionFlags: 2});
+      this.third.physics.add.existing(body, {collisionFlags: 2,shape: "box",height: player ? 1 : 5,width: player ? 1 : 5, depth: player ? 1 : 5});
 
       if(player){
         this.players[info.profile.pubkey] = body
@@ -772,34 +787,61 @@ class MainScene extends Scene3D {
     pos.copy(this.player.body.position)
     pos.add(origin);
 
-    const sphere = this.third.physics.add.sphere(
-      { radius: 0.5, x: origin.x, y: origin.y, z: origin.z, mass: 10, bufferGeometry: true },
-      { phong: { color: "green" } }
-    );
+    const ship = new ExtendedObject3D();
 
-    const force = 0.8;
+
+    let object = this.shipEnemyObj;
+    if(!object){
+      object = await this.third.load.gltf('/assets/gltf/ship_notes/scene.gltf');
+      this.shipEnemyObj = object;
+    }
+
+    //object.scene.rotateY(Math.PI + 0.1) // a hack
+    ship.add(object.scene.clone());
+
+    ship.scale.set(0.5, 0.5, 0.5)
+    //ship.position.set(this.player.position.x,this.player.position.y+5,this.player.position.z);
+    ship.position.set(origin.x, origin.y, origin.z)
+    const force = 0.08;
     pos.copy(this.player.body.position)
+    ship.name = id
     //pos.multiplyScalar(3);
-    sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
-    sphere.name = id
+    this.third.add.existing(ship);
+    this.third.physics.add.existing(ship,{shape: "box",width: 5,height: 5,depth: 15});
+    this.enemies[`${id}`] = ship;
+    ship.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
+    ship.body.onUpdate(() => {
+      const velocity = ship.body.velocity;
 
-    this.enemies.push(sphere);
-    sphere.body.on.collision((otherObject, event) => {
+      if (velocity.lengthSq() > 0) {
+        const movementDirection = velocity.clone().normalize();
+        const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), movementDirection);
+        ship.quaternion.copy(quaternion);
+      }
+    });
+    ship.body.on.collision((otherObject, event) => {
 
       if(otherObject.name === this.player.name){
         this.third.physics.destroy(this.player)
         this.respawn();
         this.third.physics.add.existing(this.player)
       }
-      this.third.destroy(sphere);
+      this.third.destroy(ship);
 
+    })
+    this.time.addEvent({
+      delay: 10000,
+      callback: () => {
+        this.third.destroy(ship);
+        this.enemies[`${id}`] = null
+      }
     })
   }
   async occupy(){
     try{
       const pos = {
         x: this.player.position.x,
-        y: this.player.position.y,
+        y: this.player.position.y - 3.5,
         z: this.player.position.z
       };
       // Occupy
@@ -1085,11 +1127,6 @@ const Game3D =  () => {
             <Text size="small">NostrChat, Iris.to, Snort Social, Yakihone and much more</Text>
             <Text size="small">Use alby extension for better experience</Text>
             <Text size="xsmall">Relays: {relays.toString()}</Text>
-
-            <Text>npub</Text>
-            <Text id="npub"></Text>
-            <Text>sk</Text>
-            <Text id="sk"></Text>
           </Box>
         </Tab>
       </Tabs>
