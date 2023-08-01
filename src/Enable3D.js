@@ -82,6 +82,7 @@ class MainScene extends Scene3D {
     this.enemies = [];
     this.maxProfiles = 100;
     this.canShoot = true;
+    this.spinningObjects = [];
   }
   async sendEnteredGameMsg(){
     // Shoot
@@ -589,20 +590,20 @@ class MainScene extends Scene3D {
       console.log(`failed to publish to ${relay} ${reason}`)
     })
   }
-  async generatePlayer(){
+  async generatePlayer() {
     /**
-      * Create Player
+    * Create Player
     */
     // create text texture
     let playerName = "Spectator "+getRandomInt(1000);
     let content;
     if(this.playerProfile){
-      try{
-        content = JSON.parse(this.playerProfile.content);
-        playerName = content.name ? content.name : content.display_name ? content.display_name : nip19.npubEncode(this.playerProfile.pubkey)
-      } catch(err){
-        playerName = nip19.npubEncode(this.playerProfile.pubkey)
-      }
+        try{
+            content = JSON.parse(this.playerProfile.content);
+            playerName = content.name ? content.name : content.display_name ? content.display_name : nip19.npubEncode(this.playerProfile.pubkey)
+        } catch(err){
+            playerName = nip19.npubEncode(this.playerProfile.pubkey)
+        }
     }
     let texture = new FLAT.TextTexture(playerName);
     // texture in 3d space
@@ -612,43 +613,46 @@ class MainScene extends Scene3D {
     this.player.name = playerName
     let playerImg
     if(!this.playerProfile){
-      // https://iris.to/note18q96a44le00tzrx4e0wm4fmh923634xr5vpuecuz8rtwv594ahpsld2h4e
-      playerImg = this.defaultImage ?
-                  this.defaultImage :
-                  await this.third.load.texture("https://nostr.build/i/nostr.build_a3bc5db060142c8c49b9cc40d2024b1ac8e602c44bb68ea2d81a85a1135211dc.jpg");
-      this.defaultImage = playerImg;
+        // https://iris.to/note18q96a44le00tzrx4e0wm4fmh923634xr5vpuecuz8rtwv594ahpsld2h4e
+        playerImg = this.defaultImage ?
+                    this.defaultImage :
+                    await this.third.load.texture("https://nostr.build/i/nostr.build_a3bc5db060142c8c49b9cc40d2024b1ac8e602c44bb68ea2d81a85a1135211dc.jpg");
+        this.defaultImage = playerImg;
     } else {
-      const loader = new THREE.TextureLoader();
+        const loader = new THREE.TextureLoader();
 
-      loader.setCrossOrigin('anonymous')
-      playerImg = content?.picture ? await loader.load(content.picture) :
-                  await this.third.load.texture(makeBlockie(nip19.npubEncode(this.playerProfile.pubkey)))
+        loader.setCrossOrigin('anonymous')
+        playerImg = content?.picture ? await loader.load(content.picture) :
+                    await this.third.load.texture(makeBlockie(nip19.npubEncode(this.playerProfile.pubkey)))
     }
-    const material = new THREE.SpriteMaterial( { map: playerImg } );
-    const sprite = new THREE.Sprite( material );
+    const material = new THREE.MeshBasicMaterial( { map: playerImg, side: THREE.DoubleSide, transparent: true } );
+    let geometry = new THREE.CircleGeometry(0.5, 32); // adjust radius and segments as needed
+    let circle = new THREE.Mesh(geometry, material);
+    circle.position.y = -0.1;
+    const scaleCircle = 0.50;
+    circle.scale.set(scaleCircle,scaleCircle,scaleCircle);
     let object = this.shipObj;
     if(!object){
-      object = await this.third.load.gltf('/assets/gltf/ship/scene.gltf');
-      this.shipObj = object;
+        object = await this.third.load.gltf('/assets/gltf/ship/scene.gltf');
+        this.shipObj = object;
     }
     object.scene.scale.set(0.005,0.005,0.005)
     object.scene.position.y = -1;
     if(!this.connected){
-      object.scene.rotateY(Math.PI + 0.1) // a hack
+        object.scene.rotateY(Math.PI + 0.1) // a hack
     }
     this.player.add(object.scene.clone())
     this.player.scale.set(0.01,0.01,0.01)
-    sprite.position.y = 0.2;
-    sprite3d.position.y = 0.8;
+    sprite3d.position.y = -0.5;
     this.player.rotateY(Math.PI + 0.1) // a hack
 
-    this.player.add(sprite)
+    this.player.add(circle)
     this.player.add(sprite3d);
     this.player.scale.set(0.25,0.25,0.25);
 
     /**
-     * Add the player to the scene with a body
-     */
+    * Add the player to the scene with a body
+    */
     await delay(1000);
     this.third.add.existing(this.player);
     this.respawn();
@@ -658,123 +662,155 @@ class MainScene extends Scene3D {
     //this.player.body.setGravity(0, 0, 0);
 
     /**
-     * Add 3rd Person Controls
-     */
+    * Add 3rd Person Controls
+    */
     this.controls = new ThirdPersonControls(this.third.camera, this.player, {
-      offset: new THREE.Vector3(0, 0.2, 0),
-      targetRadius: 2
+        offset: new THREE.Vector3(0, 0.2, 0),
+        targetRadius: 2
     });
+}
+
+async addProfile(info, player) {
+  let content;
+  try {
+    content = JSON.parse(info.profile.content);
+  } catch (err) {
+    console.log(err);
   }
-  async addProfile(info,player){
-    let content;
-    try{
-      content = JSON.parse(info.profile.content);
-    } catch(err){
-      console.log(err);
+  if (this.publickeys[info.profile.pubkey] && !player) return;
+  this.publickeys[info.profile.pubkey] = true;
+  let metadata;
+  try {
+    metadata = {
+      name: content?.display_name
+        ? content.display_name
+        : content?.name
+        ? content.name
+        : nip19.npubEncode(info.profile.pubkey),
+      description: content?.about,
+      image: content?.picture
+        ? content.picture
+        : makeBlockie(nip19.npubEncode(info.profile.pubkey)),
+      external_url: content?.website,
+    };
+
+    // create text texture
+    let text = `${metadata.name}'s base`;
+    if (player) {
+      text = metadata.name;
     }
-    if(this.publickeys[info.profile.pubkey] && !player) return;
-    this.publickeys[info.profile.pubkey] = true;
-    let metadata;
-    try{
-      metadata = {
-        name: content?.display_name ? content.display_name : content?.name ? content.name : nip19.npubEncode(info.profile.pubkey),
-        description: content?.about,
-        image: content?.picture ?
-          content.picture :
-          makeBlockie(nip19.npubEncode(info.profile.pubkey)),
-        external_url: content?.website
-      }
+    let texture = new FLAT.TextTexture(`${text}`, { color: "blue" });
+    // texture in 3d space
+    let sprite3d = new FLAT.TextSprite(texture);
+    sprite3d.position.y = player ? 0.4 : 3.2;
+    sprite3d.setScale(0.0015);
+    let image = this.images[info.profile.pubkey];
+    if (!image) {
+      const loader = new THREE.TextureLoader();
 
-      // create text texture
-      let text = `${metadata.name}'s base`;
-      if(player){
-        text = metadata.name;
+      loader.setCrossOrigin("anonymous");
+      try {
+        image = await loader.load(metadata.image);
+      } catch (err) {
+        image = makeBlockie(info.profile.pubkey);
       }
-      let texture = new FLAT.TextTexture(`${text}`,{color: "blue"});
+    }
+    let textureCube = this.textures[info.profile.pubkey];
+    if (!textureCube) {
+      textureCube = this.third.misc.textureCube([
+        image,
+        image,
+        image,
+        image,
+        image,
+        image,
+      ]);
+      this.textures[info.profile.pubkey] = textureCube;
+    }
+
+    let body = new ExtendedObject3D();
+
+    if (player) {
+      let object = this.shipObj;
+      if (!object) {
+        object = await this.third.load.gltf("/assets/gltf/ship/scene.gltf");
+        this.shipObj = object;
+      }
+      const target = object.scene.clone();
+      target.scale.set(0.0015, 0.0015, 0.0015);
+      target.position.y = -0.4;
+      body.add(target);
+
+      this.spinningObjects.push(target); // Add this line
+    } else {
+      let object = this.station;
+      if (!object) {
+        object = await this.third.load.gltf("/assets/gltf/station/scene.gltf");
+        this.station = object;
+      }
+      const clonedObject = object.scene.clone();
+      body.add(clonedObject);
+
+      this.spinningObjects.push(clonedObject); // Add this line
+    }
+    const material = new THREE.MeshBasicMaterial({
+      map: image,
+      side: THREE.DoubleSide,
+      transparent: true,
+    });
+    let geometry = new THREE.CircleGeometry(0.5, 32); // adjust radius and segments as needed
+    let circle = new THREE.Mesh(geometry, material);
+    circle.position.y = player ? 0.05 : 2.6;
+    const scaleCircle = player ? 0.25 : 0.5;
+    circle.scale.set(scaleCircle, scaleCircle, scaleCircle);
+    body.add(circle);
+    if (metadata.description && !player) {
+      text = `${metadata.description}`;
+      texture = new FLAT.TextTexture(`${text}`);
+
       // texture in 3d space
-      let sprite3d = new FLAT.TextSprite(texture)
-      sprite3d.position.y = player ? 0.4 : 3.2;
-      sprite3d.setScale(0.0015);
-      let image = this.images[info.profile.pubkey];
-      if(!image){
-        const loader = new THREE.TextureLoader();
-
-        loader.setCrossOrigin('anonymous')
-        try{
-          image = await loader.load(metadata.image);
-        } catch(err){
-          image = makeBlockie(info.profile.pubkey);
-        }
-      }
-      let textureCube = this.textures[info.profile.pubkey];
-      if(!textureCube){
-        textureCube = this.third.misc.textureCube([image,image,image,image,image,image])
-        this.textures[info.profile.pubkey] = textureCube;
-      }
-
-      let body = new ExtendedObject3D();
-
-
-      if(player){
-
-        let object = this.shipObj;
-        if(!object){
-          object = await this.third.load.gltf('/assets/gltf/ship/scene.gltf');
-          this.shipObj = object;
-        }
-        const target = object.scene.clone();
-        target.scale.set(0.0015,0.0015,0.0015)
-        target.position.y = -0.4
-        body.add(target)
-      } else {
-        let object = this.station;
-        if(!object){
-          object = await this.third.load.gltf('/assets/gltf/station/scene.gltf');
-          this.station = object;
-        }
-        body.add(object.scene.clone());
-      }
-      const material = new THREE.SpriteMaterial( { map: image } );
-      const sprite = new THREE.Sprite( material );
-      sprite.position.y = player ? 0.05 : 2.6
-      const scaleSprite = player ? 0.25 : 0.5
-      sprite.scale.set(scaleSprite,scaleSprite,scaleSprite)
+      sprite3d = new FLAT.TextSprite(texture);
+      sprite3d.position.y = 2.8;
+      sprite3d.setScale(0.001);
       body.add(sprite3d);
-      body.add(sprite);
-      if(metadata.description && !player){
-        text = `${metadata.description}`;
-        texture = new FLAT.TextTexture(`${text}`);
+    }
+    body.position.set(info.x, info.y, info.z);
+    this.third.add.existing(body);
+    this.third.physics.add.existing(body, {
+      collisionFlags: 2,
+      shape: "box",
+      height: player ? 1 : 5,
+      width: player ? 1 : 5,
+      depth: player ? 1 : 5,
+    });
 
-        // texture in 3d space
-        sprite3d = new FLAT.TextSprite(texture)
-        sprite3d.position.y = 2.8;
-        sprite3d.setScale(0.001);
-        body.add(sprite3d);
-      }
-      body.position.set(info.x,info.y,info.z)
-      this.third.add.existing(body);
-      this.third.physics.add.existing(body, {collisionFlags: 2,shape: "box",height: player ? 1 : 5,width: player ? 1 : 5, depth: player ? 1 : 5});
-
-      if(player){
-        this.players[info.profile.pubkey] = body
-      } else {
-        this.profiles[info.profile.pubkey] = body
-        this.third.physics.add.collider(body, this.player, async event => {
-          if(this.keys.e.isDown){
-            if(info.profile.pubkey){
-              let yes = window.confirm(`Open https://iris.to/${nip19.npubEncode(info.profile.pubkey)} in a new tab?` );
-              if(yes) {
-                window.open(`https://iris.to/${nip19.npubEncode(info.profile.pubkey)}`,"_blank")
-              }
+    if (player) {
+      this.players[info.profile.pubkey] = body;
+    } else {
+      this.profiles[info.profile.pubkey] = body;
+      this.third.physics.add.collider(body, this.player, async (event) => {
+        if (this.keys.e.isDown) {
+          if (info.profile.pubkey) {
+            let yes = window.confirm(
+              `Open https://iris.to/${nip19.npubEncode(
+                info.profile.pubkey
+              )} in a new tab?`
+            );
+            if (yes) {
+              window.open(
+                `https://iris.to/${nip19.npubEncode(info.profile.pubkey)}`,
+                "_blank"
+              );
             }
           }
-        });
-      }
-
-    } catch(err){
-      console.log(err)
+        }
+      });
     }
+  } catch (err) {
+    console.log(err);
   }
+}
+
   async addEnemy(id){
 
     const pos = new THREE.Vector3();
@@ -810,7 +846,7 @@ class MainScene extends Scene3D {
     this.third.physics.add.existing(ship,{shape: "box",width: 5,height: 5,depth: 15});
     this.enemies[`${id}`] = ship;
     ship.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
-    ship.body.onUpdate(() => {
+    ship.body.on.update(() => {
       const velocity = ship.body.velocity;
 
       if (velocity.lengthSq() > 0) {
@@ -1015,6 +1051,13 @@ class MainScene extends Scene3D {
       }
 
     }
+    this.spinGltfModels();
+  }
+  spinGltfModels() {
+    const rotationSpeed = 0.01; // Set this to the speed you want
+    this.spinningObjects.forEach(object => {
+      object.rotation.y += rotationSpeed;
+    });
   }
 }
 
@@ -1083,7 +1126,7 @@ const Game3D =  () => {
       <br></br>
       <Tabs>
         <Tab title="Instructions" className='tab'>
-        <Box pad="medium" className='TabArea' direction="row" gap="large">
+        <Box pad="medium" className='TabArea Tab' direction="row" gap="large">
         <Box basis="1/2">
           <Text><button class="o-btn">C</button>&nbsp; &nbsp; &nbsp;Connect Nostr</Text>
           <Text><button class="o-btn">W</button>&nbsp; &nbsp; &nbsp;Move foward</Text>
@@ -1091,7 +1134,7 @@ const Game3D =  () => {
           <Text><button class="o-btn">F</button>&nbsp; &nbsp; &nbsp;Shoot</Text>
         </Box>
         <Box basis="1/2">
-          <Text>Mouse:  Move camera direction</Text>
+          <Text><button class="o-btn">I</button>&nbsp; &nbsp; &nbsp;Show/Hide instructions</Text>
           {
             window.nostr &&
             <Text><button class="o-btn">O</button>&nbsp; &nbsp; &nbsp;Occupy position</Text>
@@ -1100,8 +1143,8 @@ const Game3D =  () => {
             window.webln &&
             <Text ><button class="o-btn">K</button>&nbsp; &nbsp; &nbsp;Send SATs to devs</Text>
           }
-          <Text><button class="o-btn">I</button>&nbsp; &nbsp; &nbsp;Instructions</Text>
           <Text><button class="o-btn">E</button>&nbsp; &nbsp; &nbsp;View profile</Text>
+          <Text>Mouse:  Move camera direction</Text>
 
         </Box>
         </Box>

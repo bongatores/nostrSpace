@@ -18,6 +18,10 @@
   background-color: red;
 }
 
+.tab span{
+  color: white !important;
+}
+
 .MainBox Tabs Tab{
   background-color: red;
 }
