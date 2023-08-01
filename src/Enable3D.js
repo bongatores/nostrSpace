@@ -846,15 +846,7 @@ async addProfile(info, player) {
     this.third.physics.add.existing(ship,{shape: "box",width: 5,height: 5,depth: 15});
     this.enemies[`${id}`] = ship;
     ship.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
-    ship.body.on.update(() => {
-      const velocity = ship.body.velocity;
 
-      if (velocity.lengthSq() > 0) {
-        const movementDirection = velocity.clone().normalize();
-        const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), movementDirection);
-        ship.quaternion.copy(quaternion);
-      }
-    });
     ship.body.on.collision((otherObject, event) => {
 
       if(otherObject.name === this.player.name){
