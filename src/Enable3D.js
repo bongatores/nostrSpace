@@ -299,7 +299,7 @@ class MainScene extends Scene3D {
           limit: 100,
         },
         {
-          kinds: [40],
+          kinds: [40,42],
           limit: 10,
         },
         {
@@ -460,12 +460,16 @@ class MainScene extends Scene3D {
 
       sphere.body.on.collision((otherObject, event) => {
 
-        if(otherObject.name === this.player.name){
-          this.third.physics.destroy(this.player)
-          this.respawn();
-          this.third.physics.add.existing(this.player)
+        try{
+          if(otherObject.name === this.player.name){
+            this.third.physics.destroy(this.player)
+            this.respawn();
+            this.third.physics.add.existing(this.player)
+          }
+          this.third.destroy(sphere);
+        } catch(err){
+          console.log(err);
         }
-        this.third.destroy(sphere);
 
 
       })
@@ -511,13 +515,17 @@ class MainScene extends Scene3D {
       }
     })
     sphere.body.on.collision((otherObject, event) => {
-      if (otherObject.name !== 'ground')
-      if(otherObject.name === this.player.name){
-        this.third.physics.destroy(this.player)
-        this.respawn();
-        this.third.physics.add.existing(this.player)
+      try{
+        if (otherObject.name !== 'ground')
+        if(otherObject.name === this.player.name){
+          this.third.physics.destroy(this.player)
+          this.respawn();
+          this.third.physics.add.existing(this.player)
+        }
+        this.third.destroy(sphere);
+      }catch(err){
+        console.log(err)
       }
-      this.third.destroy(sphere);
 
     })
   }
@@ -849,19 +857,27 @@ async addProfile(info, player) {
 
     ship.body.on.collision((otherObject, event) => {
 
-      if(otherObject.name === this.player.name){
-        this.third.physics.destroy(this.player)
-        this.respawn();
-        this.third.physics.add.existing(this.player)
-      }
-      this.third.destroy(ship);
+      try{
+        if(otherObject.name === this.player.name){
+          this.third.physics.destroy(this.player)
+          this.respawn();
+          this.third.physics.add.existing(this.player)
+        }
+        this.third.destroy(ship);
 
+      }catch(err){
+        console.log(err)
+      }
     })
     this.time.addEvent({
-      delay: 10000,
+      delay: 25000,
       callback: () => {
-        this.third.destroy(ship);
-        this.enemies[`${id}`] = null
+        try{
+          this.third.destroy(ship);
+          this.enemies[`${id}`] = null
+        }catch(err){
+          console.log(err)
+        }
       }
     })
   }
