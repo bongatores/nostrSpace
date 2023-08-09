@@ -272,7 +272,7 @@ class MainScene extends Scene3D {
   }
   async subscribeNostrEvents(){
     const relayOffChain = await initRelay('wss://offchain.pub'); // Default relay
-    const relayNostrChat = await initRelay('wss://relay2.nostrchat.io') // to get more data
+    const relayNostrChat = await initRelay('wss://relay1.nostrchat.io') // to get more data
     this.relay = relayOffChain;
     let subOffChain = relayOffChain.sub(
       [
