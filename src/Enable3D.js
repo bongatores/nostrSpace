@@ -271,8 +271,7 @@ class MainScene extends Scene3D {
 
   }
   async subscribeNostrEvents(){
-    const relayOffChain = await initRelay('wss://offchain.pub'); // Default relay
-    const relayNostrChat = await initRelay('wss://relay2.nostrchat.io') // to get more data
+    const relayOffChain = await initRelay('wss://nostr-pub.wellorder.net/'); // Default relay
     this.relay = relayOffChain;
     let subOffChain = relayOffChain.sub(
       [
@@ -292,6 +291,7 @@ class MainScene extends Scene3D {
         }
       ]
     );
+    const relayNostrChat = await initRelay('wss://relay2.nostrchat.io') // to get more data
     let subNostrChat = relayNostrChat.sub(
       [
         {
@@ -761,28 +761,24 @@ async addProfile(info, player) {
 
       this.spinningObjects.push(clonedObject); // Add this line
     }
-    const material = new THREE.MeshBasicMaterial({
-      map: image,
-      side: THREE.DoubleSide,
-      transparent: true,
-    });
-    let geometry = new THREE.CircleGeometry(0.5, 32); // adjust radius and segments as needed
-    let circle = new THREE.Mesh(geometry, material);
-    circle.position.y = player ? 0.05 : 2.6;
-    const scaleCircle = player ? 0.25 : 0.5;
-    circle.scale.set(scaleCircle, scaleCircle, scaleCircle);
-    body.add(circle);
-    if (metadata.description && !player) {
+    const material = new THREE.SpriteMaterial( { map: image } );
+    const sprite = new THREE.Sprite( material );
+    sprite.position.y = player ? 0.05 : 2.6
+    const scaleSprite = player ? 0.25 : 0.5
+    sprite.scale.set(scaleSprite,scaleSprite,scaleSprite)
+    body.add(sprite3d);
+    body.add(sprite);
+    if(metadata.description && !player){
       text = `${metadata.description}`;
       texture = new FLAT.TextTexture(`${text}`);
 
       // texture in 3d space
-      sprite3d = new FLAT.TextSprite(texture);
+      sprite3d = new FLAT.TextSprite(texture)
       sprite3d.position.y = 2.8;
       sprite3d.setScale(0.001);
       body.add(sprite3d);
     }
-    body.position.set(info.x, info.y, info.z);
+    body.position.set(info.x,info.y,info.z)
     this.third.add.existing(body);
     this.third.physics.add.existing(body, {
       collisionFlags: 2,
