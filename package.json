@@ -6,6 +6,7 @@
   "dependencies": {
     "@apollo/client": "^3.5.9",
     "@enable3d/phaser-extension": "^0.25.3",
+    "@getalby/sdk": "^2.2.3",
     "@react-three/drei": "^9.57.0",
     "@react-three/fiber": "^8.11.9",
     "@testing-library/jest-dom": "^5.16.2",

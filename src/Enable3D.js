@@ -109,8 +109,13 @@ class MainScene extends Scene3D {
     if(window.nostr){
       keys = await connectWallet();
     } else {
-      keys = await generateKeys();
-      this.sk = keys.sk;
+      try{
+        keys = await connectWallet();
+        this.nwc = keys.nwc;
+      } catch(err){
+        keys = await generateKeys();
+        this.sk = keys.sk;
+      }
     }
     newNostrPubKey = keys.pk
     let newProfile = await pool.get(relays, {
@@ -158,6 +163,10 @@ class MainScene extends Scene3D {
 
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    // Load Assets //
+    this.shipObj = await this.third.load.gltf('/assets/gltf/ship/scene.gltf');
+    this.station = await this.third.load.gltf("/assets/gltf/station/scene.gltf");
+    this.shipEnemyObj = await this.third.load.gltf('/assets/gltf/ship_notes/scene.gltf');
 
     //await this.generateScenario();
 
@@ -557,6 +566,8 @@ class MainScene extends Scene3D {
   async signEvent(event){
     if(window.nostr){
       event = await window.nostr.signEvent(event)
+    } else if(this.nwc){
+      event = this.nwc.signEvent(event);
     } else if(this.sk){
       event.sig = signEvent(event, this.sk);
     }
@@ -640,10 +651,7 @@ class MainScene extends Scene3D {
     const scaleCircle = 0.50;
     circle.scale.set(scaleCircle,scaleCircle,scaleCircle);
     let object = this.shipObj;
-    if(!object){
-        object = await this.third.load.gltf('/assets/gltf/ship/scene.gltf');
-        this.shipObj = object;
-    }
+
     object.scene.scale.set(0.005,0.005,0.005)
     object.scene.position.y = -1;
     if(!this.connected){
@@ -740,10 +748,7 @@ async addProfile(info, player) {
 
     if (player) {
       let object = this.shipObj;
-      if (!object) {
-        object = await this.third.load.gltf("/assets/gltf/ship/scene.gltf");
-        this.shipObj = object;
-      }
+
       const target = object.scene.clone();
       target.scale.set(0.0015, 0.0015, 0.0015);
       target.position.y = -0.4;
@@ -752,10 +757,7 @@ async addProfile(info, player) {
       //this.spinningObjects.push(target); // Add this line
     } else {
       let object = this.station;
-      if (!object) {
-        object = await this.third.load.gltf("/assets/gltf/station/scene.gltf");
-        this.station = object;
-      }
+
       const clonedObject = object.scene.clone();
       body.add(clonedObject);
 
@@ -831,10 +833,6 @@ async addProfile(info, player) {
 
 
     let object = this.shipEnemyObj;
-    if(!object){
-      object = await this.third.load.gltf('/assets/gltf/ship_notes/scene.gltf');
-      this.shipEnemyObj = object;
-    }
 
     //object.scene.rotateY(Math.PI + 0.1) // a hack
     ship.add(object.scene.clone());
@@ -951,9 +949,13 @@ async addProfile(info, player) {
     }
   }
   async keysend(){
-    if(!window.webln) return;
-    await window.webln.enable();
-    await window.webln.lnurl("lnurl1dp68gurn8ghj7ampd3kx2ar0veekzar0wd5xjtnrdakj7tnhv4kxctttdehhwm30d3h82unvwqhhqatjwpkx2arjda6hgwpk6dleua");
+    if(!window.webln && !this.nwc) return;
+    let webln = window.web3;
+    if(!webln){
+      webln = this.nwc;
+    }
+    await webln.enable();
+    await webln.lnurl("lnurl1dp68gurn8ghj7ampd3kx2ar0veekzar0wd5xjtnrdakj7tnhv4kxctttdehhwm30d3h82unvwqhhqatjwpkx2arjda6hgwpk6dleua");
     this.keysending = false;
 
   }
@@ -1049,7 +1051,7 @@ async addProfile(info, player) {
 
       }
 
-      if(window.webln && this.keys.k.isDown && !this.keysending){
+      if((window.webln || this.nwc) && this.keys.k.isDown && !this.keysending){
         this.keysending = true;
         this.keysend();
       }

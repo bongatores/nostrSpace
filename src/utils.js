@@ -1,4 +1,5 @@
 import {nip19, generatePrivateKey, getPublicKey,relayInit} from 'nostr-tools'
+import { webln } from '@getalby/sdk';
 
 
 export const ordinalsUrl = (utxo) => {
@@ -23,7 +24,23 @@ export const connectWallet = async () => {
       npub: npub
     })
   } else {
-    alert("Oops, it looks like you haven't set up your Nostr key yet. Go to your Alby Account Settings and create or import a Nostr key.")
+    alert("Alby extension not detected, trying to login with Nostr Wallet Connect followed by ephemeral keys generation");
+    // prompt the user to connect to NWC
+    const nwc = webln.NostrWebLNProvider.withNewSecret();
+
+    await nwc.initNWC({
+      name: "NostrSpace-Test",
+    });
+    const url = nwc.getNostrWalletConnectUrl(true);
+    await nwc.enable();
+    const pk = nwc.publicKey;
+    const npub = nip19.npubEncode(pk)
+    return({
+      pk: pk,
+      npub: npub,
+      nwc: nwc
+    });
+    // now use any webln code
     return
   }
 }
