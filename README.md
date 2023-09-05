@@ -1,11 +1,27 @@
 # NostrSpace
 
-  A 3d space where all places can be yours until someone removes them from you (soon).
-  View nostr profiles in a 3d empty world! Interactions coming soon if possible.
+  A 3d space where all places can be yours.
+  View nostr profiles in a 3d empty world!
 
   Events that occurs in Nostr (profile creation, channel creation, reactions to a post) generates artfacts in the game. Profiles are bases in the space, channels are black holes, reactions are antimatter particles at fast speed. Users can login with Nostr, occupy space with its profile, fire at other players and move in the space.
 
   Messages sent to Nostr are identified by their tags and kinds in order to recognize the action done by players (shoot, movement, occupy positions).
+
+## Kinds
+
+  Kind 0 (Profiles) loads profile's base, the npub is converted to bytes to have its position defined;
+
+  Kind 1 (Short Text Note): Generates "Intergalactical travelers" represented by a spaceship, they should be able to be destroyed if shooted;
+
+  Kind 30078 (Arbitrary custom app data): It is tagged with 'nostr-space-position' to allow player change his base's position;
+
+  Kind 7 (Reactions): Any reaction to a post in nostr will render "antimatter" particles (red small sphere moving in high velocity) that kills players if touches him;
+
+  Kind 40 (Group Channel Creation): Groups created in nostr are rendered as a very big black sphere that represents black holes (player dies if touches it);
+
+  Kind 29211 (Ephemeral): This is tagged with 'nostr-space-movement' to show current player's position to others players in the game or tagged with 'nostr-space-shoot' to trigger shoot from player that sent message;
+
+  When player log in with nostr, a message is sent to https://www.nostrchat.io/channel/6afddc25a8ed486b0c1e6e556077a9eef3e0d7236014b891495ae20d557a2346 to show that player entered the game.
 
 ## Technologies
 
@@ -20,9 +36,13 @@
 ## Testing Guide
 
 #### Controls
-  - `WASD` keys: Move
-  - `O` key: Insert data in the current coordinate
-  - `E` key: View profile at iris.to
+  - `C`: Connect Nostr  
+  - `W`: Move foward
+  - `S`: Stop
+  - `O`: Insert base in the current coordinate
+  - `E`: View profile at iris.to
+  - `F`: Shoot
+  - `K`: Donate to ⚡️ lingeringwaterfall23085@getalby.com
 
 # Getting Started with Create React App
 
