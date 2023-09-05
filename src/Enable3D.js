@@ -113,6 +113,7 @@ class MainScene extends Scene3D {
         keys = await connectWallet();
         this.nwc = keys.nwc;
       } catch(err){
+        alert(err.message)
         keys = await generateKeys();
         this.sk = keys.sk;
       }
@@ -280,13 +281,13 @@ class MainScene extends Scene3D {
 
   }
   async subscribeNostrEvents(){
-    const relayOffChain = await initRelay('wss://nostr-pub.wellorder.net/'); // Default relay
+    const relayOffChain = await initRelay('wss://relay2.nostrchat.io'); // Default relay
     this.relay = relayOffChain;
     let subOffChain = relayOffChain.sub(
       [
         {
           '#t': ['nostr-space'],
-          kinds: [12301]
+          kinds: [30078]
         },
         {
           '#t': ['nostr-space'],
@@ -300,12 +301,12 @@ class MainScene extends Scene3D {
         }
       ]
     );
-    const relayNostrChat = await initRelay('wss://relay2.nostrchat.io') // to get more data
+    const relayNostrChat = await initRelay('wss://relay1.nostrchat.io') // to get more data
     let subNostrChat = relayNostrChat.sub(
       [
         {
           kinds: [0],
-          limit: 100,
+          limit: 50,
         },
         {
           kinds: [40,42],
@@ -335,14 +336,15 @@ class MainScene extends Scene3D {
 
     let subProfileData;
     // Kind 0: Metadata profile
+
     if(data.kind === 0){
       subProfileData = data;
       this.profileData[data.pubkey] = subProfileData;
-      // Kind 12301 Replaceable and Kind 29211 Ephemeral (Movements and Shoots)
+      // Kind 30078 Arbitrary custom app data and Kind 29211 Ephemeral (Movements and Shoots)
       // Getting profile to show it after if needed
     } else if(this.profileData[data.pubkey] !== undefined){
       subProfileData = this.profileData[data.pubkey];
-    } else if((data.kind === 12301 || data.kind === 29211)){
+    } else if((data.kind === 30078 || data.kind === 29211)){
       // Get profile from multiple relays: cant be sure if the connected relay has the profile
       subProfileData = await pool.get(relays, {
        authors: [
@@ -379,7 +381,7 @@ class MainScene extends Scene3D {
       return;
     }
 
-    if(data.kind === 12301){
+    if(data.kind === 30078){
       this.handleBasePosition(data,subProfileData);
       return;
     }
@@ -761,7 +763,7 @@ async addProfile(info, player) {
       const clonedObject = object.scene.clone();
       body.add(clonedObject);
 
-      this.spinningObjects.push(clonedObject); // Add this line
+      //this.spinningObjects.push(clonedObject); // Add this line
     }
     const material = new THREE.SpriteMaterial( { map: image } );
     const sprite = new THREE.Sprite( material );
@@ -884,12 +886,13 @@ async addProfile(info, player) {
       };
       // Occupy
       let event = {
-        kind: 12301,
+        kind: 30078,
         pubkey: this.nostrPubKey,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
           ['t', 'nostr-space'],
-          ['nostr-space-position',JSON.stringify(pos)]
+          ['nostr-space-position',JSON.stringify(pos)],
+          ['d', 'NostrSpacePosition']
         ],
         content: `Update to position - (${this.player.position.x},${this.player.position.y},${this.player.position.z})`
       }
@@ -955,7 +958,7 @@ async addProfile(info, player) {
       webln = this.nwc;
     }
     await webln.enable();
-    await webln.lnurl("lnurl1dp68gurn8ghj7ampd3kx2ar0veekzar0wd5xjtnrdakj7tnhv4kxctttdehhwm30d3h82unvwqhhqatjwpkx2arjda6hgwpk6dleua");
+    await webln.lnurl("LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0D3H82UNVWQHKC6TWVAJHY6TWVAMKZAR9WFNXZMRVXGENQWP4MJMXA4");
     this.keysending = false;
 
   }
@@ -1145,10 +1148,7 @@ const Game3D =  () => {
             window.nostr &&
             <Text><button class="o-btn">O</button>&nbsp; &nbsp; &nbsp;Occupy position</Text>
           }
-          {
-            window.webln &&
-            <Text ><button class="o-btn">K</button>&nbsp; &nbsp; &nbsp;Send SATs to devs</Text>
-          }
+          <Text><button class="o-btn">K</button>&nbsp; &nbsp; &nbsp;Send SATs to devs</Text>
           <Text><button class="o-btn">E</button>&nbsp; &nbsp; &nbsp;View profile</Text>
           <Text>Mouse:  Move camera direction</Text>
 
