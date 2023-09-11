@@ -281,7 +281,7 @@ class MainScene extends Scene3D {
 
   }
   async subscribeNostrEvents(){
-    const relayOffChain = await initRelay('wss://relay2.nostrchat.io'); // Default relay
+    const relayOffChain = await initRelay('wss://nostr-01.bolt.observer/'); // Default relay
     this.relay = relayOffChain;
     let subOffChain = relayOffChain.sub(
       [
@@ -301,6 +301,11 @@ class MainScene extends Scene3D {
         }
       ]
     );
+
+    subOffChain.on('event', async data => {
+      this.handleEventsEmited(data);
+    });
+
     const relayNostrChat = await initRelay('wss://relay1.nostrchat.io') // to get more data
     let subNostrChat = relayNostrChat.sub(
       [
@@ -319,10 +324,6 @@ class MainScene extends Scene3D {
         }
       ]
     )
-    subOffChain.on('event', async data => {
-      this.handleEventsEmited(data);
-    });
-
     subNostrChat.on('event', async data => {
       this.handleEventsEmited(data);
     })
@@ -367,7 +368,11 @@ class MainScene extends Scene3D {
 
     const bytesEvent = stringToBytes(data.id);
 
-
+    if(data.kind === 30078){
+      this.handleBasePosition(data,subProfileData);
+      return;
+    }
+    
     if(data.kind === 0 && subProfileData.content){
       const bytes = stringToBytes(subProfileData.pubkey);
 
@@ -381,10 +386,7 @@ class MainScene extends Scene3D {
       return;
     }
 
-    if(data.kind === 30078){
-      this.handleBasePosition(data,subProfileData);
-      return;
-    }
+
 
     if(data.kind === 7){
       this.spawnAntimatter(bytesEvent);
@@ -405,7 +407,7 @@ class MainScene extends Scene3D {
       body = this.players[subProfileData.pubkey]
     }
     const tagPos = data.tags.filter(tag => tag[0] === 'nostr-space-position')
-    if(tagPos !== undefined){
+    if(tagPos !== undefined || tagPos?.length > 0){
       if(body){
         const pos = JSON.parse(tagPos[0][1]);
         body.body.needUpdate = true
@@ -413,9 +415,9 @@ class MainScene extends Scene3D {
         this.profiles[subProfileData.pubkey] = body
       } else {
         let info = {
-          x: JSON.parse(data.tags[1][1]).x,
-          y: JSON.parse(data.tags[1][1]).y,
-          z: JSON.parse(data.tags[1][1]).z,
+          x: JSON.parse(data.tags[2][1]).x,
+          y: JSON.parse(data.tags[2][1]).y,
+          z: JSON.parse(data.tags[2][1]).z,
           profile: subProfileData
         }
         this.addProfile(info,false);
@@ -890,9 +892,9 @@ async addProfile(info, player) {
         pubkey: this.nostrPubKey,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
+          ['d', 'NostrSpacePosition'],
           ['t', 'nostr-space'],
-          ['nostr-space-position',JSON.stringify(pos)],
-          ['d', 'NostrSpacePosition']
+          ['nostr-space-position',JSON.stringify(pos)]
         ],
         content: `Update to position - (${this.player.position.x},${this.player.position.y},${this.player.position.z})`
       }
