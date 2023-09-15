@@ -1,20 +1,6 @@
 import {nip19, generatePrivateKey, getPublicKey,relayInit} from 'nostr-tools'
 import { webln } from '@getalby/sdk';
 
-
-export const ordinalsUrl = (utxo) => {
-  return `https://ordinals.com/output/${utxo.txid}:${utxo.vout}`
-}
-
-export const ordinalsImageUrl = (utxo) => {
-  return `https://ordinals.com/content/${utxo.txid}i${utxo.vout}`
-}
-
-export const cloudfrontUrl = (utxo) => {
-  return `https://d2v3k2do8kym1f.cloudfront.net/minted-items/${utxo.txid}:${utxo.vout}`
-}
-
-
 export const connectWallet = async () => {
   if (window.nostr) {
     const pk = await window.nostr.getPublicKey();
@@ -89,6 +75,48 @@ export const changeRelay = async (newUrl,relay) => {
  return(newRelay);
 
 }
+
+
+const base64UrlEncode = (input) => {
+  let base64 = Buffer.from(input, 'hex').toString('base64');
+  let base64Url = base64.replace(/\+/g, '-').replace(/\//g, '_');
+  return base64Url;
+};
+
+export const fetchTaprootAssets = async (rest_host,macaroon_hex) => {
+ let url = `${rest_host}/v1/taproot-assets/assets`;
+ let options = {
+    // Work-around for self-signed certificates.
+    rejectUnauthorized: false,
+    json: true,
+    method: 'GET',
+    headers: {
+      'Grpc-Metadata-macaroon': macaroon_hex,
+    },
+ }
+ const response = await fetch(url,options);
+ const data = await response.json();
+ alert(`Found a total of ${data.assets.length} taproot assets`);
+ const asset_id = data.assets[1].asset_genesis.asset_id;
+ const encodedId = base64UrlEncode(asset_id);
+ console.log(asset_id)
+ url = `${rest_host}/v1/taproot-assets/assets/meta?asset_id=${encodeURIComponent(encodedId)}`;
+ options = {
+    // Work-around for self-signed certificates.
+    rejectUnauthorized: false,
+    json: true,
+    headers: {
+      'Grpc-Metadata-macaroon': macaroon_hex,
+    },
+ }
+ const assetResp = await fetch(url,options);
+ const assetData = await assetResp.json();
+ const metadata = Buffer.from(assetData.data,'hex').toString('utf8')
+ console.log(metadata)
+ alert(JSON.stringify(assetData));
+ alert(`Metadata: ${metadata}`)
+}
+
 export const relays = [
  'wss://offchain.pub',
  //'ws://127.0.0.1:8008', // localhost, test

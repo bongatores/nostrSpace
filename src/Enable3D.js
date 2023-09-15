@@ -31,7 +31,8 @@ import {
   generateKeys,
   relays,
   initRelay,
-  changeRelay
+  changeRelay,
+  fetchTaprootAssets
 } from './utils';
 import {
   SimplePool,
@@ -150,6 +151,12 @@ class MainScene extends Scene3D {
     //document.getElementById("sk").innerHTML = keys?.sk;
 
   }
+  async connectTapRootNode(){
+
+    const newRestUrl = prompt("Write rest url of taproot node (ligthning polar regtest)");
+    const newMacaroon = prompt("Write admin macaroon of taproot node (ligthning polar regtest)");
+    await fetchTaprootAssets(newRestUrl,newMacaroon);
+  }
   async create() {
 
     const { lights } = await this.third.warpSpeed('-ground', '-orbitControls','-sky')
@@ -220,6 +227,7 @@ class MainScene extends Scene3D {
       f: this.input.keyboard.addKey('f'),
       e: this.input.keyboard.addKey('e'),
       c: this.input.keyboard.addKey('c'),
+      t: this.input.keyboard.addKey('t'),
       k: this.input.keyboard.addKey('k'),
       i: this.input.keyboard.addKey('i'),
       o: this.input.keyboard.addKey('o'),
@@ -372,7 +380,7 @@ class MainScene extends Scene3D {
       this.handleBasePosition(data,subProfileData);
       return;
     }
-    
+
     if(data.kind === 0 && subProfileData.content){
       const bytes = stringToBytes(subProfileData.pubkey);
 
@@ -1028,6 +1036,9 @@ async addProfile(info, player) {
       if(this.keys.c.isDown && !this.connecting && !this.connected){
         this.connecting = true;
         this.connect();
+      }
+      if(this.keys.t.isDown && this.connected){
+        this.connectTapRootNode();
       }
       if(this.keys.o.isDown && !this.occuping && this.connected){
         this.occuping = true;
