@@ -97,24 +97,27 @@ export const fetchTaprootAssets = async (rest_host,macaroon_hex) => {
  const response = await fetch(url,options);
  const data = await response.json();
  alert(`Found a total of ${data.assets.length} taproot assets`);
- const asset_id = data.assets[1].asset_genesis.asset_id;
- const encodedId = base64UrlEncode(asset_id);
- console.log(asset_id)
- url = `${rest_host}/v1/taproot-assets/assets/meta?asset_id=${encodeURIComponent(encodedId)}`;
- options = {
-    // Work-around for self-signed certificates.
-    rejectUnauthorized: false,
-    json: true,
-    headers: {
-      'Grpc-Metadata-macaroon': macaroon_hex,
-    },
+ for(let asset of data.assets){
+   const asset_id = asset.asset_genesis.asset_id;
+   const encodedId = base64UrlEncode(asset_id);
+   console.log(asset_id)
+   url = `${rest_host}/v1/taproot-assets/assets/meta?asset_id=${encodeURIComponent(encodedId)}`;
+   options = {
+      // Work-around for self-signed certificates.
+      rejectUnauthorized: false,
+      json: true,
+      headers: {
+        'Grpc-Metadata-macaroon': macaroon_hex,
+      },
+   }
+   const assetResp = await fetch(url,options);
+   const assetData = await assetResp.json();
+   const metadata = Buffer.from(assetData.data,'hex').toString('utf8')
+   console.log(metadata)
+   alert(JSON.stringify(assetData));
+   alert(`Metadata: ${metadata}`)
+
  }
- const assetResp = await fetch(url,options);
- const assetData = await assetResp.json();
- const metadata = Buffer.from(assetData.data,'hex').toString('utf8')
- console.log(metadata)
- alert(JSON.stringify(assetData));
- alert(`Metadata: ${metadata}`)
 }
 
 export const relays = [
