@@ -291,7 +291,7 @@ class MainScene extends Scene3D {
 
   }
   async subscribeNostrEvents(){
-    const relayOffChain = await initRelay('wss://nostr-01.bolt.observer/'); // Default relay
+    const relayOffChain = await initRelay('wss://nostr-pub.wellorder.net/'); // Default relay
     this.relay = relayOffChain;
     let subOffChain = relayOffChain.sub(
       [
