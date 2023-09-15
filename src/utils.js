@@ -116,8 +116,8 @@ export const fetchTaprootAssets = async (rest_host,macaroon_hex) => {
    console.log(metadata)
    alert(JSON.stringify(assetData));
    alert(`Metadata: ${metadata}`)
-
  }
+ return(data);
 }
 
 export const relays = [

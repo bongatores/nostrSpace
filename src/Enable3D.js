@@ -84,6 +84,7 @@ class MainScene extends Scene3D {
     this.maxProfiles = 100;
     this.canShoot = true;
     this.spinningObjects = [];
+    this.speed = 0.8;
   }
   async sendEnteredGameMsg(){
     // Shoot
@@ -155,7 +156,8 @@ class MainScene extends Scene3D {
 
     const newRestUrl = prompt("Write rest url of taproot node (ligthning polar regtest)");
     const newMacaroon = prompt("Write admin macaroon of taproot node (ligthning polar regtest)");
-    await fetchTaprootAssets(newRestUrl,newMacaroon);
+    const data = await fetchTaprootAssets(newRestUrl,newMacaroon);
+    this.speed = this.speed + data.assets.length/10
   }
   async create() {
 
@@ -984,7 +986,7 @@ async addProfile(info, player) {
       /**
        * Player Turn
        */
-      const speed = 0.8
+      const speed = this.speed;
       const v3 = new THREE.Vector3()
 
       const rotation = this.third.camera.getWorldDirection(v3)
