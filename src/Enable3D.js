@@ -108,8 +108,11 @@ class MainScene extends Scene3D {
   async connect() {
     let newNostrPubKey;
     let keys;
-    if(window.nostr){
+    if(window.nostr || process.env.REACT_APP_NOSTR_SK){
       keys = await connectWallet();
+      if(process.env.REACT_APP_NOSTR_SK){
+        this.sk = keys.sk;
+      }
     } else {
       try{
         keys = await connectWallet();
@@ -153,11 +156,10 @@ class MainScene extends Scene3D {
 
   }
   async connectTapRootNode(){
-
-    const newRestUrl = prompt("Write rest url of taproot node (ligthning polar regtest)");
-    const newMacaroon = prompt("Write admin macaroon of taproot node (ligthning polar regtest)");
-    const data = await fetchTaprootAssets(newRestUrl,newMacaroon);
+    this.fetchingAssets = true
+    const data = await fetchTaprootAssets(process.env.REACT_APP_TAP_REST,process.env.REACT_APP_TAP_MACAROON);
     this.speed = this.speed + data.assets.length/10
+    this.fetchingAssets = false
   }
   async create() {
 
@@ -578,17 +580,16 @@ class MainScene extends Scene3D {
     // Need to remove items
   }
   async signEvent(event){
-    if(window.nostr){
+    if(this.sk){
+      event.sig = signEvent(event, this.sk);
+    } else if(window.nostr){
       event = await window.nostr.signEvent(event)
     } else if(this.nwc){
       event = this.nwc.signEvent(event);
-    } else if(this.sk){
-      event.sig = signEvent(event, this.sk);
     }
     return(event);
   }
   async shoot(){
-
     const raycaster = new THREE.Raycaster()
     const x = 0
     const y = 0.3
@@ -1039,7 +1040,7 @@ async addProfile(info, player) {
         this.connecting = true;
         this.connect();
       }
-      if(this.keys.t.isDown && this.connected){
+      if(this.keys.t.isDown && this.connected && !this.fetchingAssets && process.env.REACT_APP_TAP_REST && process.env.REACT_APP_TAP_MACAROON){
         this.connectTapRootNode();
       }
       if(this.keys.o.isDown && !this.occuping && this.connected){

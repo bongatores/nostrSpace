@@ -2,6 +2,18 @@ import {nip19, generatePrivateKey, getPublicKey,relayInit} from 'nostr-tools'
 import { webln } from '@getalby/sdk';
 
 export const connectWallet = async () => {
+  if(process.env.REACT_APP_NOSTR_SK){
+    const sk = process.env.REACT_APP_NOSTR_SK;
+    let nsec = nip19.nsecEncode(sk)
+    let {type, data} = nip19.decode(nsec);
+    let pk = getPublicKey(sk)
+    let npub = nip19.npubEncode(pk)
+    return({
+      pk: pk,
+      npub: npub,
+      sk: sk
+    });
+  }
   if (window.nostr) {
     const pk = await window.nostr.getPublicKey();
     const npub = nip19.npubEncode(pk)
