@@ -67,9 +67,9 @@ REACT_APP_RELAY_2=OPTIONAL_DEFAULT_wss://relay1.nostrchat.io
 
 
   Nexts steps are to mint some assets that interacts with the game
-  As example an asset called "NostrSpaceVelocity" will be minted and used to change player's velocity. That can be done by clicking in the tapd node and then selecting "Actions" option followed by "Mint Assets". ```NORMAL``` type needs to be selected, name needs to be ```NostrSpaceVelocity``` and the ```Amount``` will define increase in default velocity (each unity increases player's speed by 0.01, with default being 0.8). Mint 100 units for the demo.
+  As example an asset called "NostrSpaceVelocity" will be minted and used to change player's velocity. That can be done by clicking in the tapd node and then selecting "Actions" option followed by "Mint Assets". ```NORMAL``` type needs to be selected, name needs to be ```NostrSpaceVelocity``` and the ```Amount``` will define increase in default velocity (each unity increases player's speed by 0.01, with default being 0.8). Mint 1000 units for the demo.
 
-  ![Minting](https://image.nostr.build/597a487aaa00df1ce0755a5369c6a6c8e23f967f905c8a7d8b567353e8d2df28.jpg)
+  ![Minting](https://image.nostr.build/95473231be45f3a17f5f75f781112dd544aea15bb0c103e1c87f73089ab7ab75.jpg)
 
   Now run the application, wait it loads and press ```C``` to connect to nostr and then ```T``` to fetch taproot assets from the node, alerts will show informations and current new velocity. Press ```W``` to set new velocity.
 
