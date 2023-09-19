@@ -158,7 +158,19 @@ class MainScene extends Scene3D {
   async connectTapRootNode(){
     this.fetchingAssets = true
     const data = await fetchTaprootAssets(process.env.REACT_APP_TAP_REST,process.env.REACT_APP_TAP_MACAROON);
-    this.speed = this.speed + data.assets.length/10
+    for(let asset of data.assets){
+      console.log(asset)
+      const name = asset.asset_genesis.name;
+      const amount = asset.amount;
+      const type = asset.asset_type;
+      alert(`${name} - ${amount} - ${type}`);
+      if(type === "NORMAL" && name === "NostrSpaceVelocity" && !this.tapVelCheck){
+        this.tapVelCheck = true;
+        this.speed = 0.8 + Number(amount)/100
+        alert(`New speed: ${this.speed}`);
+      }
+    }
+    this.tapVelCheck = false;
     this.fetchingAssets = false
   }
   async create() {
@@ -293,7 +305,7 @@ class MainScene extends Scene3D {
 
   }
   async subscribeNostrEvents(){
-    const relayOffChain = await initRelay('wss://nostr-pub.wellorder.net/'); // Default relay
+    const relayOffChain = await initRelay(process.env.REACT_APP_RELAY_1 ? process.env.REACT_APP_RELAY_1 : 'wss://nostr-pub.wellorder.net/'); // Default relay
     this.relay = relayOffChain;
     let subOffChain = relayOffChain.sub(
       [
@@ -318,7 +330,7 @@ class MainScene extends Scene3D {
       this.handleEventsEmited(data);
     });
 
-    const relayNostrChat = await initRelay('wss://relay1.nostrchat.io') // to get more data
+    const relayNostrChat = await initRelay(process.env.REACT_APP_RELAY_2 ? process.env.REACT_APP_RELAY_2 : 'wss://relay1.nostrchat.io') // to get more data
     let subNostrChat = relayNostrChat.sub(
       [
         {

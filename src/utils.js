@@ -126,8 +126,8 @@ export const fetchTaprootAssets = async (rest_host,macaroon_hex) => {
    const assetData = await assetResp.json();
    const metadata = Buffer.from(assetData.data,'hex').toString('utf8')
    console.log(metadata)
-   alert(JSON.stringify(assetData));
-   alert(`Metadata: ${metadata}`)
+  //alert(JSON.stringify(assetData));
+  // alert(`Metadata: ${metadata}`)
  }
  return(data);
 }

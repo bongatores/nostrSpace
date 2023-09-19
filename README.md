@@ -7,6 +7,8 @@
 
   Messages sent to Nostr are identified by their tags and kinds in order to recognize the action done by players (shoot, movement, occupy positions).
 
+  Taproot Assets changes player's attributes (velocity, localhost only).
+
 ## Kinds
 
   Kind 0 (Profiles) loads profile's base, the npub is converted to bytes to have its position defined;
@@ -30,8 +32,7 @@
   - **ThreeJS** - renders the 3d world and allows the user to explore it and interact with it;
   - **Nostr** -  get profiles,get channels, get reactions, allow sending messages that will be used to place information in the world
   - **Alby** - allow login with nostr and bitcoin lightning;
-
-
+  - **Taproot Assets**(localhost with lightning polar only) - assets that the connected node contains will change the player's attributes (velocity, fire rate, spaceship). This is optional feature included to explore taproot assets protocol and tester need to use alongside lightningpolar regtest network. The name and type (normal or collectible) of assets will define what attribute should be changed (name should be replaced with asset's id but to simplify tests this one was choosen).
 
 ## Testing Guide
 
@@ -43,6 +44,36 @@
   - `E`: View profile at iris.to
   - `F`: Shoot
   - `K`: Donate to ⚡️ lingeringwaterfall23085@getalby.com
+  - `T`: Fetch taproot assets (localhost only)
+
+#### Taproot Assets - Localhost Test
+
+  Initate [LightiningPolar](https://lightningpolar.com/), create or import and start a regtest with at least 1 tapd node
+
+![LightningPolar Image](https://image.nostr.build/1a61f11dd594dbf55d1537679779c5b5ea737d50a7610eef342ee12e450061c5.jpg)
+
+  Create a .env file at project's root directory with following content:
+
+```
+REACT_APP_NOSTR_SK=TEST_NOSTR_PRIVKEY
+REACT_APP_TAP_REST=CHECK_ON_LIGHTNINGPOLAR_REST
+REACT_APP_TAP_MACAROON=CHECK_ON_LIGHTNINGPOLAR_MACAROON
+REACT_APP_RELAY_1=OPTIONAL_DEFAULT_wss://nostr-pub.wellorder.net/
+REACT_APP_RELAY_2=OPTIONAL_DEFAULT_wss://relay1.nostrchat.io
+```
+
+  TapRoot node's informations can be seen by clicking at it in Lightning polar UI and then checking "Connect tab", where "REST Host" and "Admin Macaroon" (Hex encoded) can be get to be used as ``REACT_APP_TAP_REST`` and ``REACT_APP_TAP_MACAROON``.
+  ``REACT_APP_NOSTR_SK`` can be generated at some NOSTR clients like https://iris.to/ and then checking "Settings".
+
+
+  Nexts steps are to mint some assets that interacts with the game
+  As example an asset called "NostrSpaceVelocity" will be minted and used to change player's velocity. That can be done by clicking in the tapd node and then selecting "Actions" option followed by "Mint Assets". ```NORMAL``` type needs to be selected, name needs to be ```NostrSpaceVelocity``` and the ```Amount``` will define increase in default velocity (each unity increases player's speed by 0.01, with default being 0.8). Mint 100 units for the demo.
+
+  ![Minting](https://image.nostr.build/597a487aaa00df1ce0755a5369c6a6c8e23f967f905c8a7d8b567353e8d2df28.jpg)
+
+  Now run the application, wait it loads and press ```C``` to connect to nostr and then ```T``` to fetch taproot assets from the node, alerts will show informations and current new velocity. Press ```W``` to set new velocity.
+
+  ![NewSpeed](https://image.nostr.build/eae847a2d918745dae162f59b77f0415449190fd16bf313436808a55a22530dc.jpg)
 
 # Getting Started with Create React App
 
