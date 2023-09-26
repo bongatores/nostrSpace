@@ -662,7 +662,7 @@ class MainScene extends Scene3D {
         // https://iris.to/note18q96a44le00tzrx4e0wm4fmh923634xr5vpuecuz8rtwv594ahpsld2h4e
         playerImg = this.defaultImage ?
                     this.defaultImage :
-                    await this.third.load.texture("https://nostr.build/i/nostr.build_a3bc5db060142c8c49b9cc40d2024b1ac8e602c44bb68ea2d81a85a1135211dc.jpg");
+                    await this.third.load.texture("https://image.nostr.build/nostr.build_a3bc5db060142c8c49b9cc40d2024b1ac8e602c44bb68ea2d81a85a1135211dc.jpg");
         this.defaultImage = playerImg;
     } else {
         const loader = new THREE.TextureLoader();
