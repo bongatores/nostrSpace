@@ -668,7 +668,7 @@ class MainScene extends Scene3D {
         const loader = new THREE.TextureLoader();
 
         loader.setCrossOrigin('anonymous')
-        playerImg = content?.picture ? await loader.load(content.picture) :
+        playerImg = content?.picture ? await loader.load(content.picture.replace("nostr.build/i/","image.nostr.build/")) :
                     await this.third.load.texture(makeBlockie(nip19.npubEncode(this.playerProfile.pubkey)))
     }
     const material = new THREE.MeshBasicMaterial( { map: playerImg, side: THREE.DoubleSide, transparent: true } );
@@ -753,7 +753,7 @@ async addProfile(info, player) {
 
       loader.setCrossOrigin("anonymous");
       try {
-        image = await loader.load(metadata.image);
+        image = await loader.load(metadata.image.replace("nostr.build/i/","image.nostr.build/"));
       } catch (err) {
         image = makeBlockie(info.profile.pubkey);
       }
