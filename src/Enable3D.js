@@ -56,7 +56,7 @@ function getRandomInt(max) {
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
 const pool = new SimplePool()
-
+const NOSTR_ASSETS_PUBKEY = '6c0fde2a3b2e481e21bdf09b377e0c3e5391bf0353db06ab37c88945a8a77402';
 let imgUri;
 
 
@@ -108,11 +108,12 @@ class MainScene extends Scene3D {
   async connect() {
     let newNostrPubKey;
     let keys;
-    if(window.nostr || process.env.REACT_APP_NOSTR_SK){
+    if(window.nostr){// || process.env.REACT_APP_NOSTR_SK){
       keys = await connectWallet();
-      if(process.env.REACT_APP_NOSTR_SK){
+      /*if(process.env.REACT_APP_NOSTR_SK){
         this.sk = keys.sk;
       }
+      */
     } else {
       try{
         keys = await connectWallet();
@@ -153,7 +154,33 @@ class MainScene extends Scene3D {
     //document.getElementById("npub").innerHTML = keys?.npub;
 
     //document.getElementById("sk").innerHTML = keys?.sk;
+    const relayNostrTaprootAssets = await initRelay(process.env.REACT_APP_RELAY_3 ? process.env.REACT_APP_RELAY_3 : 'wss://relay.nostrassets.com') // to get more data
+    let subNostrTaprootAssets = relayNostrTaprootAssets.sub(
+      [
+        {
+          kinds: [4],
+          authors: [NOSTR_ASSETS_PUBKEY],
+          "#p": [this.nostrPubKey],
+          since: Math.floor(Date.now() / 1000),
+        }
+      ]
+    )
+    subNostrTaprootAssets.on('event', async data => {
+      console.log(data);
+      let message;
+      if(window.nostr){
 
+        message = await window.nostr.nip04.decrypt(data.pubkey,data.content);
+        console.log(message);
+        alert(message);
+        const ordi = message.split('ORDI')[1].split("Balance:")[1].replace(/\D/g, '');
+        this.speed = 0.8 + Number(ordi)/1000
+        const meme = message.split('MEME')[1].split("Balance:")[1].replace(/\D/g, '');
+        const usdt = message.split('USDT')[1].split("Balance:")[1].replace(/\D/g, '');
+      }
+    });
+    this.relayNostrTaprootAssets = relayNostrTaprootAssets;
+    this.getNostrTaprootAssets();
   }
   async connectTapRootNode(){
     this.fetchingAssets = true
@@ -350,7 +377,8 @@ class MainScene extends Scene3D {
     )
     subNostrChat.on('event', async data => {
       this.handleEventsEmited(data);
-    })
+    });
+
   }
   async handleEventsEmited(data){
     // Kind 1: Short Text Notes
@@ -712,137 +740,163 @@ class MainScene extends Scene3D {
         targetRadius: 2
     });
 }
+  async getNostrTaprootAssets() {
 
-async addProfile(info, player) {
-  let content;
-  try {
-    content = JSON.parse(info.profile.content);
-  } catch (err) {
-    console.log(err);
-  }
-  if (this.publickeys[info.profile.pubkey] && !player) return;
-  this.publickeys[info.profile.pubkey] = true;
-  let metadata;
-  try {
-    metadata = {
-      name: content?.display_name
-        ? content.display_name
-        : content?.name
-        ? content.name
-        : nip19.npubEncode(info.profile.pubkey),
-      description: content?.about,
-      image: content?.picture
-        ? content.picture
-        : makeBlockie(nip19.npubEncode(info.profile.pubkey)),
-      external_url: content?.website,
-    };
-
-    // create text texture
-    let text = `${metadata.name}'s base`;
-    if (player) {
-      text = metadata.name;
-    }
-    let texture = new FLAT.TextTexture(`${text}`, { color: "blue" });
-    // texture in 3d space
-    let sprite3d = new FLAT.TextSprite(texture);
-    sprite3d.position.y = player ? 0.4 : 3.2;
-    sprite3d.setScale(0.0015);
-    let image = this.images[info.profile.pubkey];
-    if (!image) {
-      const loader = new THREE.TextureLoader();
-
-      loader.setCrossOrigin("anonymous");
-      try {
-        image = await loader.load(metadata.image.replace("nostr.build/i/","image.nostr.build/"));
-      } catch (err) {
-        image = makeBlockie(info.profile.pubkey);
-      }
-    }
-    let textureCube = this.textures[info.profile.pubkey];
-    if (!textureCube) {
-      textureCube = this.third.misc.textureCube([
-        image,
-        image,
-        image,
-        image,
-        image,
-        image,
-      ]);
-      this.textures[info.profile.pubkey] = textureCube;
+    // on the sender side
+    let message = 'balance';
+    let ciphertext;
+    if(window.nostr){
+      ciphertext = await window.nostr.nip04.encrypt(NOSTR_ASSETS_PUBKEY,message);
     }
 
-    let body = new ExtendedObject3D();
 
-    if (player) {
-      let object = this.shipObj;
-
-      const target = object.scene.clone();
-      target.scale.set(0.0015, 0.0015, 0.0015);
-      target.position.y = -0.4;
-      body.add(target);
-
-      //this.spinningObjects.push(target); // Add this line
-    } else {
-      let object = this.station;
-
-      const clonedObject = object.scene.clone();
-      body.add(clonedObject);
-
-      //this.spinningObjects.push(clonedObject); // Add this line
+    let event = {
+      kind: 4,
+      pubkey: this.nostrPubKey,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ['p', NOSTR_ASSETS_PUBKEY,'wss://relay.nostrassets.com']
+      ],
+      content: ciphertext
     }
-    const material = new THREE.SpriteMaterial( { map: image } );
-    const sprite = new THREE.Sprite( material );
-    sprite.position.y = player ? 0.05 : 2.6
-    const scaleSprite = player ? 0.25 : 0.5
-    sprite.scale.set(scaleSprite,scaleSprite,scaleSprite)
-    body.add(sprite3d);
-    body.add(sprite);
-    if(metadata.description && !player){
-      text = `${metadata.description}`;
-      texture = new FLAT.TextTexture(`${text}`);
+    event.id = getEventHash(event)
 
-      // texture in 3d space
-      sprite3d = new FLAT.TextSprite(texture)
-      sprite3d.position.y = 2.8;
-      sprite3d.setScale(0.001);
-      body.add(sprite3d);
-    }
-    body.position.set(info.x,info.y,info.z)
-    this.third.add.existing(body);
-    this.third.physics.add.existing(body, {
-      collisionFlags: 2,
-      shape: "box",
-      height: player ? 1 : 5,
-      width: player ? 1 : 5,
-      depth: player ? 1 : 5,
+    event = await this.signEvent(event);
+    let pubs = this.relayNostrTaprootAssets.publish(event)
+    pubs.on('ok', (res) => {
+      console.log(res);
     });
+  }
+  async addProfile(info, player) {
+    let content;
+    try {
+      content = JSON.parse(info.profile.content);
+    } catch (err) {
+      console.log(err);
+    }
+    if (this.publickeys[info.profile.pubkey] && !player) return;
+    this.publickeys[info.profile.pubkey] = true;
+    let metadata;
+    try {
+      metadata = {
+        name: content?.display_name
+          ? content.display_name
+          : content?.name
+          ? content.name
+          : nip19.npubEncode(info.profile.pubkey),
+        description: content?.about,
+        image: content?.picture
+          ? content.picture
+          : makeBlockie(nip19.npubEncode(info.profile.pubkey)),
+        external_url: content?.website,
+      };
 
-    if (player) {
-      this.players[info.profile.pubkey] = body;
-    } else {
-      this.profiles[info.profile.pubkey] = body;
-      this.third.physics.add.collider(body, this.player, async (event) => {
-        if (this.keys.e.isDown) {
-          if (info.profile.pubkey) {
-            let yes = window.confirm(
-              `Open https://iris.to/${nip19.npubEncode(
-                info.profile.pubkey
-              )} in a new tab?`
-            );
-            if (yes) {
-              window.open(
-                `https://iris.to/${nip19.npubEncode(info.profile.pubkey)}`,
-                "_blank"
+      // create text texture
+      let text = `${metadata.name}'s base`;
+      if (player) {
+        text = metadata.name;
+      }
+      let texture = new FLAT.TextTexture(`${text}`, { color: "blue" });
+      // texture in 3d space
+      let sprite3d = new FLAT.TextSprite(texture);
+      sprite3d.position.y = player ? 0.4 : 3.2;
+      sprite3d.setScale(0.0015);
+      let image = this.images[info.profile.pubkey];
+      if (!image) {
+        const loader = new THREE.TextureLoader();
+
+        loader.setCrossOrigin("anonymous");
+        try {
+          image = await loader.load(metadata.image.replace("nostr.build/i/","image.nostr.build/"));
+        } catch (err) {
+          image = makeBlockie(info.profile.pubkey);
+        }
+      }
+      let textureCube = this.textures[info.profile.pubkey];
+      if (!textureCube) {
+        textureCube = this.third.misc.textureCube([
+          image,
+          image,
+          image,
+          image,
+          image,
+          image,
+        ]);
+        this.textures[info.profile.pubkey] = textureCube;
+      }
+
+      let body = new ExtendedObject3D();
+
+      if (player) {
+        let object = this.shipObj;
+
+        const target = object.scene.clone();
+        target.scale.set(0.0015, 0.0015, 0.0015);
+        target.position.y = -0.4;
+        body.add(target);
+
+        //this.spinningObjects.push(target); // Add this line
+      } else {
+        let object = this.station;
+
+        const clonedObject = object.scene.clone();
+        body.add(clonedObject);
+
+        //this.spinningObjects.push(clonedObject); // Add this line
+      }
+      const material = new THREE.SpriteMaterial( { map: image } );
+      const sprite = new THREE.Sprite( material );
+      sprite.position.y = player ? 0.05 : 2.6
+      const scaleSprite = player ? 0.25 : 0.5
+      sprite.scale.set(scaleSprite,scaleSprite,scaleSprite)
+      body.add(sprite3d);
+      body.add(sprite);
+      if(metadata.description && !player){
+        text = `${metadata.description}`;
+        texture = new FLAT.TextTexture(`${text}`);
+
+        // texture in 3d space
+        sprite3d = new FLAT.TextSprite(texture)
+        sprite3d.position.y = 2.8;
+        sprite3d.setScale(0.001);
+        body.add(sprite3d);
+      }
+      body.position.set(info.x,info.y,info.z)
+      this.third.add.existing(body);
+      this.third.physics.add.existing(body, {
+        collisionFlags: 2,
+        shape: "box",
+        height: player ? 1 : 5,
+        width: player ? 1 : 5,
+        depth: player ? 1 : 5,
+      });
+
+      if (player) {
+        this.players[info.profile.pubkey] = body;
+      } else {
+        this.profiles[info.profile.pubkey] = body;
+        this.third.physics.add.collider(body, this.player, async (event) => {
+          if (this.keys.e.isDown) {
+            if (info.profile.pubkey) {
+              let yes = window.confirm(
+                `Open https://iris.to/${nip19.npubEncode(
+                  info.profile.pubkey
+                )} in a new tab?`
               );
+              if (yes) {
+                window.open(
+                  `https://iris.to/${nip19.npubEncode(info.profile.pubkey)}`,
+                  "_blank"
+                );
+              }
             }
           }
-        }
-      });
+        });
+      }
+    } catch (err) {
+      console.log(err);
     }
-  } catch (err) {
-    console.log(err);
   }
-}
 
   async addEnemy(id){
 
@@ -1052,8 +1106,9 @@ async addProfile(info, player) {
         this.connecting = true;
         this.connect();
       }
-      if(this.keys.t.isDown && this.connected && !this.fetchingAssets && process.env.REACT_APP_TAP_REST && process.env.REACT_APP_TAP_MACAROON){
-        this.connectTapRootNode();
+      if(this.keys.t.isDown && this.connected && !this.fetchingAssets){// && process.env.REACT_APP_TAP_REST && process.env.REACT_APP_TAP_MACAROON){
+        //this.connectTapRootNode();
+        this.getNostrTaprootAssets();
       }
       if(this.keys.o.isDown && !this.occuping && this.connected){
         this.occuping = true;

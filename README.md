@@ -46,34 +46,11 @@
   - `K`: Donate to ⚡️ lingeringwaterfall23085@getalby.com
   - `T`: Fetch taproot assets (localhost only)
 
-#### Taproot Assets - Localhost Test
+#### Taproot Assets - NostrAssets
 
-  Initate [LightiningPolar](https://lightningpolar.com/), create or import and start a regtest with at least 1 tapd node
+  Get some assets at (https://test.nostrassets.com/#/faucet)[https://test.nostrassets.com/#/faucet] and connect NostrSpace.
 
-![LightningPolar Image](https://image.nostr.build/1a61f11dd594dbf55d1537679779c5b5ea737d50a7610eef342ee12e450061c5.jpg)
-
-  Create a .env file at project's root directory with following content:
-
-```
-REACT_APP_NOSTR_SK=TEST_NOSTR_PRIVKEY
-REACT_APP_TAP_REST=CHECK_ON_LIGHTNINGPOLAR_REST
-REACT_APP_TAP_MACAROON=CHECK_ON_LIGHTNINGPOLAR_MACAROON
-REACT_APP_RELAY_1=OPTIONAL_DEFAULT_wss://nostr-pub.wellorder.net/
-REACT_APP_RELAY_2=OPTIONAL_DEFAULT_wss://relay1.nostrchat.io
-```
-
-  TapRoot node's informations can be seen by clicking at it in Lightning polar UI and then checking "Connect tab", where "REST Host" and "Admin Macaroon" (Hex encoded) can be get to be used as ``REACT_APP_TAP_REST`` and ``REACT_APP_TAP_MACAROON``.
-  ``REACT_APP_NOSTR_SK`` can be generated at some NOSTR clients like https://iris.to/ and then checking "Settings".
-
-
-  Nexts steps are to mint some assets that interacts with the game
-  As example an asset called "NostrSpaceVelocity" will be minted and used to change player's velocity. That can be done by clicking in the tapd node and then selecting "Actions" option followed by "Mint Assets". ```NORMAL``` type needs to be selected, name needs to be ```NostrSpaceVelocity``` and the ```Amount``` will define increase in default velocity (each unity increases player's speed by 0.01, with default being 0.8). Mint 1000 units for the demo.
-
-  ![Minting](https://image.nostr.build/95473231be45f3a17f5f75f781112dd544aea15bb0c103e1c87f73089ab7ab75.jpg)
-
-  Now run the application, wait it loads and press ```C``` to connect to nostr and then ```T``` to fetch taproot assets from the node, alerts will show informations and current new velocity. Press ```W``` to set new velocity.
-
-  ![NewSpeed](https://image.nostr.build/eae847a2d918745dae162f59b77f0415449190fd16bf313436808a55a22530dc.jpg)
+  - ORDI changes speed;
 
 # Getting Started with Create React App
 

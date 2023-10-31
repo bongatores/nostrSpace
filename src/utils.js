@@ -1,8 +1,8 @@
-import {nip19, generatePrivateKey, getPublicKey,relayInit} from 'nostr-tools'
+import {nip19,nip44, generatePrivateKey, getPublicKey,relayInit} from 'nostr-tools'
 import { webln } from '@getalby/sdk';
 
 export const connectWallet = async () => {
-  if(process.env.REACT_APP_NOSTR_SK){
+  /*if(process.env.REACT_APP_NOSTR_SK){
     const sk = process.env.REACT_APP_NOSTR_SK;
     let nsec = nip19.nsecEncode(sk)
     let {type, data} = nip19.decode(nsec);
@@ -14,6 +14,7 @@ export const connectWallet = async () => {
       sk: sk
     });
   }
+  */
   if (window.nostr) {
     const pk = await window.nostr.getPublicKey();
     const npub = nip19.npubEncode(pk)
@@ -22,8 +23,10 @@ export const connectWallet = async () => {
       npub: npub
     })
   } else {
-    alert("Alby extension not detected, trying to login with Nostr Wallet Connect followed by ephemeral keys generation");
+    //alert("Alby extension not detected, trying to login with Nostr Wallet Connect followed by ephemeral keys generation");
+    alert("Ephemeral keys generation");
     // prompt the user to connect to NWC
+    /*
     const nwc = webln.NostrWebLNProvider.withNewSecret();
 
     await nwc.initNWC({
@@ -33,11 +36,13 @@ export const connectWallet = async () => {
     await nwc.enable();
     const pk = nwc.publicKey;
     const npub = nip19.npubEncode(pk)
+
     return({
       pk: pk,
       npub: npub,
-      nwc: nwc
+      //nwc: nwc
     });
+    */
     // now use any webln code
     return
   }
@@ -132,12 +137,14 @@ export const fetchTaprootAssets = async (rest_host,macaroon_hex) => {
  return(data);
 }
 
+
 export const relays = [
  'wss://offchain.pub',
  //'ws://127.0.0.1:8008', // localhost, test
  'wss://relay2.nostrchat.io',
  'wss://nostr.fmt.wiz.biz',
  'wss://relay.damus.io',
+ 'wss://relay.nostrassets.com',
  'wss://relay.nostr.info',
  'wss://relay.snort.social',
 ]
