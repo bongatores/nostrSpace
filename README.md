@@ -32,7 +32,7 @@
   - **ThreeJS** - renders the 3d world and allows the user to explore it and interact with it;
   - **Nostr** -  get profiles,get channels, get reactions, allow sending messages that will be used to place information in the world
   - **Alby** - allow login with nostr and bitcoin lightning;
-  - **Taproot Assets**(localhost with lightning polar only) - assets that the connected node contains will change the player's attributes (velocity, fire rate, spaceship). This is optional feature included to explore taproot assets protocol and tester need to use alongside lightningpolar regtest network. The name and type (normal or collectible) of assets will define what attribute should be changed (name should be replaced with asset's id but to simplify tests this one was choosen).
+  - **Taproot Assets** - [Nostr Assets](https://test.nostrassets.com) - assets that the connected npub contains will change the player's attributes (velocity, fire rate, spaceship). This is optional feature included to explore taproot assets protocol and tester need to use [Nostr Assets](https://test.nostrassets.com) by getting assets in their [testnet faucet](https://test.nostrassets.com/#/faucet). The name and type (normal or collectible) of assets will define what attribute should be changed.
 
 ## Testing Guide
 
@@ -44,11 +44,11 @@
   - `E`: View profile at iris.to
   - `F`: Shoot
   - `K`: Donate to ⚡️ lingeringwaterfall23085@getalby.com
-  - `T`: Fetch taproot assets (localhost only)
+  - `T`: Fetch taproot assets [Nostr Assets](https://test.nostrassets.com)
 
 #### Taproot Assets - NostrAssets
 
-  Get some assets at (https://test.nostrassets.com/#/faucet)[https://test.nostrassets.com/#/faucet] and connect NostrSpace.
+  Get some assets at [https://test.nostrassets.com/#/faucet](https://test.nostrassets.com/#/faucet) and connect NostrSpace.
 
   - ORDI changes speed;
 
