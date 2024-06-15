@@ -1,4 +1,7 @@
 import {useEffect,useState} from  'react';
+import LNC from '@lightninglabs/lnc-web';
+import Peer from 'peerjs';
+import {Buffer} from 'buffer';
 import Phaser from 'phaser';
 import './enable3d.css';
 
@@ -61,9 +64,10 @@ let imgUri;
 
 
 class MainScene extends Scene3D {
-  constructor() {
+  constructor(data) {
     super({ key: 'MainScene' });
-
+    this.peerInstance = data.peer;
+    this.peerId = data.peerId;
   }
 
   init() {
@@ -85,18 +89,20 @@ class MainScene extends Scene3D {
     this.canShoot = true;
     this.spinningObjects = [];
     this.speed = 0.8;
+    this.connections = [];
   }
   async sendEnteredGameMsg(){
-    // Shoot
+    //this.peer.on()
     let event = {
       kind: 42,
       pubkey: this.nostrPubKey,
       created_at: Math.floor(Date.now() / 1000),
       tags: [
         ['e','6afddc25a8ed486b0c1e6e556077a9eef3e0d7236014b891495ae20d557a2346','wss://relay2.nostrchat.io','root'],
-        ['t', 'nostr-space']
+        ['t', 'nostr-space'],
+        ['peerJsId',this.serverId]
       ],
-      content: `Just entered the space!`
+      content: this.serverId === this.peerId ? `Just entered the space as the server!` : `Just entered the space at server ${this.serverId}!`
     }
     event.id = getEventHash(event)
     event = await this.signEvent(event);
@@ -151,37 +157,72 @@ class MainScene extends Scene3D {
     // add red dot
     this.redDot = this.add.circle(this.cameras.main.width / 2 , this.cameras.main.height / 2 - 120, 2, 0xff0000)
     this.redDot.depth = 1
-    //document.getElementById("npub").innerHTML = keys?.npub;
-
-    //document.getElementById("sk").innerHTML = keys?.sk;
-    const relayNostrTaprootAssets = await initRelay(process.env.REACT_APP_RELAY_3 ? process.env.REACT_APP_RELAY_3 : 'wss://relay.nostrassets.com') // to get more data
-    let subNostrTaprootAssets = relayNostrTaprootAssets.sub(
-      [
-        {
-          kinds: [4],
-          authors: [NOSTR_ASSETS_PUBKEY],
-          "#p": [this.nostrPubKey],
-          since: Math.floor(Date.now() / 1000),
-        }
-      ]
-    )
-    subNostrTaprootAssets.on('event', async data => {
-      console.log(data);
-      let message;
-      if(window.nostr){
-
-        message = await window.nostr.nip04.decrypt(data.pubkey,data.content);
-        console.log(message);
-        alert(message);
-        const ordi = message.split('ORDI')[1].split("Balance:")[1].replace(/\D/g, '');
-        this.speed = 0.8 + Number(ordi)/1000
-        const meme = message.split('MEME')[1].split("Balance:")[1].replace(/\D/g, '');
-        const usdt = message.split('USDT')[1].split("Balance:")[1].replace(/\D/g, '');
-      }
-    });
-    this.relayNostrTaprootAssets = relayNostrTaprootAssets;
-    this.getNostrTaprootAssets();
   }
+
+
+  async connectLNC(){
+    try{
+      this.fetchingAssets = true;
+      const pairingPhrase = window.prompt("Enter readonly testnet LNC Pairing Phrase");
+      const pwd = window.prompt("Define a password");
+      const lnc = new LNC({
+          pairingPhrase: pairingPhrase,
+          password: pwd
+      });
+      console.log(`LNC ready: ${lnc.isReady}`);
+      console.log(lnc)
+      await lnc.preload();
+      await lnc.run();
+      await lnc.connect();
+      console.log(`LNC connected: ${lnc.isConnected}`);
+      this.lnc = lnc;
+      await delay(2500);
+      this.fetchingAssets = false;
+      this.fetchAssetsLNC();
+      return;
+    } catch(err){
+      this.fetchingAssets = false;
+    }
+  }
+  async fetchAssetsLNC(){
+    try{
+      this.fetchingAssets = true;
+      const { taprootAssets, mint, universe, assetWallet } = this.lnc?.tapd;
+      if(!taprootAssets){
+        return;
+      }
+      const data = await taprootAssets.listAssets();
+      let assetsArr = [];
+      console.log(data);
+      for(let asset of data.assets){
+        if(asset.assetType === "COLLECTIBLE"){
+          const meta = await taprootAssets.fetchAssetMeta({asset_id: asset.assetGenesis.assetId.replace(/\+/g, '-').replace(/\//g, '_')});
+          assetsArr.push({
+            ...asset,
+            decodedMeta: Buffer.from(meta.data,'base64').toString('utf8')
+          });
+          console.log(assetsArr)
+        } else {
+          const name = asset.assetGenesis.name;
+          const amount = asset.amount;
+          const genesisPoint = asset.assetGenesis.genesisPoint;
+          alert(`${name} - ${amount} - ${asset.assetType}`);
+          if(genesisPoint === "d093a015ac32b4e29e9da1b2fab45acf27b21b8f34fe949a86a691802cd21765:1" && !this.tapVelCheck){
+            this.tapVelCheck = true;
+            this.speed = 1 + Number(amount)/100
+            alert(`New speed: ${this.speed} - Asset: ${name} - Amount: ${amount}` );
+          }
+          assetsArr.push(asset);
+        }
+      }
+      this.tapVelCheck = false;
+      this.fetchingAssets = false;
+      this.assetsArr = assetsArr;
+    } catch(err){
+      this.fetchingAssets = false;
+    }
+  }
+
   async connectTapRootNode(){
     this.fetchingAssets = true
     const data = await fetchTaprootAssets(process.env.REACT_APP_TAP_REST,process.env.REACT_APP_TAP_MACAROON);
@@ -222,11 +263,23 @@ class MainScene extends Scene3D {
     //await this.generateScenario();
 
 
+
+    //this.third.physics.debug.enable()
+    let event = await pool.get(relays, {
+      kinds: [42],
+      '#t':['nostr-space']
+    })
+    if(event.pubkey !== this.nostrPubKey){
+      const tagPeerId = event.tags.filter(tag => tag[0] === 'peerJsId')
+      console.log(event)
+      console.log(tagPeerId)
+      this.serverId = tagPeerId[0][1]
+    }
+    this.handlePeerEvents();
     await this.generatePlayer();
     this.setControls();
     this.subscribeNostrEvents();
     this.loadSkybox();
-    //this.third.physics.debug.enable()
 
   }
 
@@ -332,18 +385,13 @@ class MainScene extends Scene3D {
 
   }
   async subscribeNostrEvents(){
-    const relayOffChain = await initRelay(process.env.REACT_APP_RELAY_1 ? process.env.REACT_APP_RELAY_1 : 'wss://nostr-pub.wellorder.net/'); // Default relay
+    const relayOffChain = await initRelay(process.env.REACT_APP_RELAY_1 ? process.env.REACT_APP_RELAY_1 : 'wss://relay2.nostrchat.io'); // Default relay
     this.relay = relayOffChain;
     let subOffChain = relayOffChain.sub(
       [
         {
           '#t': ['nostr-space'],
           kinds: [30078]
-        },
-        {
-          '#t': ['nostr-space'],
-          kinds: [29211],
-          since: Math.floor(Date.now() / 1000)
         },
         {
           kinds: [1],
@@ -411,12 +459,9 @@ class MainScene extends Scene3D {
       subProfileData = {
         pubkey: data.pubkey
       }
+      this.profileData[data.pubkey] = subProfileData;
     }
 
-    if(data.kind === 29211){
-      this.handleEphemeralEvents(data,subProfileData);
-      return;
-    }
 
     const bytesEvent = stringToBytes(data.id);
 
@@ -447,7 +492,6 @@ class MainScene extends Scene3D {
 
 
     if(data.kind === 40 || data.kind === 42){
-
      this.spawnBlackHole(bytesEvent);
      return;
 
@@ -540,6 +584,164 @@ class MainScene extends Scene3D {
       })
     }
   }
+  handlePeerEvents(){
+    // Create a room
+    if(!this.serverId){
+      this.handleHubConn();
+    } else {
+      this.handlePeerConn()
+    }
+  }
+  handleHubConn() {
+      this.peerInstance.on('connection', (conn) => {
+          this.connections.push(conn);
+          console.log("Peer connected: " + conn.peer);
+          conn.on('open', () => {
+
+              conn.send({
+                  type: "newConnection",
+                  data: conn.peer
+              });
+              this.connections.forEach(c => {
+                  if (c !== conn) {
+                      c.send({
+                          type: "newConnection",
+                          data: conn.peer
+                      });
+                  }
+              });
+          });
+
+          conn.on('data', (data) => {
+              console.log('Received data:', data);
+              // React to data
+              this.reactToData(data);
+              this.connections.forEach(c => {
+                  if (c !== conn) {
+                      c.send(data);
+                  }
+              });
+          });
+          conn.on('close', () => {
+              console.log("Connection closed with: " + conn.peer);
+              this.connections = this.connections.filter(c => c !== conn);
+          });
+          conn.on('error', (err) => {
+              console.error("Connection error with: " + conn.peer, err);
+          });
+
+      });
+      this.peerInstance.on('error', (err) => {
+          console.error('PeerJS error:', err);
+      });
+  }
+  handlePeerConn() {
+      // Peer
+      const conn = this.peerInstance.connect(this.serverId, {
+          reliable: true
+      });
+
+      conn.on('open', () => {
+          console.log("Connected to: " + conn.peer);
+          this.conn = conn;
+          // Extract data from friendlyUnits to send
+          conn.send({
+              type: "newConnection",
+              data: conn.peer
+          });
+      });
+
+      conn.on('data', (data) => {
+          console.log('Received data:', data);
+          this.reactToData(data);
+      });
+
+      conn.on('close', () => {
+          console.log("Connection closed");
+      });
+      conn.on('error', (err) => {
+          console.error("Connection error with: " + conn.peer, err);
+      });
+      this.peerInstance.on('error', (err) => {
+          console.error('PeerJS error:', err);
+          this.serverId = this.peerId;
+          if(conn){
+            conn.close();
+          }
+          this.handleHubConn();
+      });
+  }
+  reactToData(msg) {
+    // Handle data received from PeerJS in Phaser
+    console.log('Reacting to msg:', msg);
+    // Assuming data is an array of enemy unit positions
+    if(typeof(msg) === "object"){
+      const data = msg.data;
+      if(msg.type === "newConnection"){
+        console.log(data);
+      }
+      if(msg.type === "movement"){
+        console.log(data)
+        let body = this.profiles[data.pubkey];
+        if(!body){
+          body = this.players[data.pubkey]
+        }
+        const subProfileData = this.profileData[data.pubkey];
+        console.log(subProfileData)
+        if(body && data.pubkey !== this.nostrPubKey){
+          body.body.needUpdate = true
+          body.position.set(data.position.x,data.position.y,data.position.z);
+          body.body.setCollisionFlags(1)
+          body.body.setVelocity(data.velocity.x,data.velocity.y,data.velocity.z);
+          //this.third.add.existing(body);
+          body.body.setCollisionFlags(2)
+          this.players[data.pubkey] = body
+        } else if(data.pubkey !== this.nostrPubKey){
+          let info = {
+            x: data.position.x,
+            y: data.position.y,
+            z: data.position.z,
+            profile: subProfileData !== undefined ? subProfileData : {
+              pubkey: data.pubkey
+            }
+          }
+          this.addProfile(info,true);
+        }
+      }
+      if(msg.type === "shoot"){
+        this.handleShoot(data);
+      }
+    }
+
+  }
+  handleShoot(data){
+    const pos = new THREE.Vector3();
+    pos.copy(data.direction)
+    pos.add(data.origin)
+    const sphere = this.third.physics.add.sphere(
+      { radius: 0.050, x: pos.x, y: pos.y, z: pos.z, mass: 10, bufferGeometry: true },
+      { phong: { color: 0x202020 } }
+    );
+    const force = 8;
+    pos.copy(data.direction)
+    pos.multiplyScalar(48);
+    if(data.velocity){
+      sphere.body.setVelocity(data.velocity.x,data.velocity.y,data.velocity.z);
+    }
+    sphere.body.applyForce(pos.x*force, pos.y*force, pos.z*force);
+    sphere.body.on.collision((otherObject, event) => {
+      try{
+        if(otherObject.name === this.player.name){
+          this.third.physics.destroy(this.player)
+          this.respawn();
+          this.third.physics.add.existing(this.player)
+        }
+        this.third.destroy(sphere);
+      } catch(err){
+        console.log(err);
+      }
+    });
+  }
   spawnAntimatter(bytesEvent){
 
     const pos = new THREE.Vector3();
@@ -614,11 +816,6 @@ class MainScene extends Scene3D {
       }
     })
   }
-  async changeRelay(){
-    const newUrl = prompt("Select new relay url");
-    this.relay = await changeRelay(this.relay,newUrl);
-    // Need to remove items
-  }
   async signEvent(event){
     if(this.sk){
       event.sig = signEvent(event, this.sk);
@@ -636,33 +833,30 @@ class MainScene extends Scene3D {
 
     raycaster.setFromCamera({ x, y }, this.third.camera);
     const velocity = this.player.body.velocity;
-    let msgSend = {
+    let data = {
       direction: raycaster.ray.direction,
       origin: raycaster.ray.origin,
       velocity: velocity
     };
-    // Shoot
-    let event = {
-      kind: 29211,
-      pubkey: this.nostrPubKey,
-      created_at: Math.floor(Date.now() / 1000),
-      tags: [
-        ['t', 'nostr-space'],
-        ['nostr-space-shoot',JSON.stringify(msgSend)]
-      ],
-      content: `Shoot at position - (${this.player.body.position.x},${this.player.body.position.y},${this.player.body.position.z})`
-    }
-    event.id = getEventHash(event)
-    event = await this.signEvent(event);
-    let pubs = this.relay.publish(event)
-    pubs.on('ok', (res) => {
-      //this.canShoot = true;
-      //console.log(res);
-    });
-    pubs.on('failed', (relay,reason) => {
-      //this.shooting = false;
-      console.log(`failed to publish to ${relay} ${reason}`)
+    if(!this.nostrPubKey) return;
+    this.handleShoot(data);
+    if(this.conn){
+      this.conn.send({
+        type: "shoot",
+        from: this.nostrPubKey,
+        data: data
+      });
+      return;
+    };
+    this.connections.map(conn => {
+      conn.send({
+        type: "shoot",
+        from: this.nostrPubKey,
+        data: data
+      });
+      return;
     })
+
   }
   async generatePlayer() {
     /**
@@ -739,9 +933,34 @@ class MainScene extends Scene3D {
         offset: new THREE.Vector3(0, 0.2, 0),
         targetRadius: 2
     });
-}
+  }
   async getNostrTaprootAssets() {
 
+    const relayNostrTaprootAssets = await initRelay(process.env.REACT_APP_RELAY_3 ? process.env.REACT_APP_RELAY_3 : 'wss://relay.nostrassets.com') // to get more data
+    let subNostrTaprootAssets = relayNostrTaprootAssets.sub(
+      [
+        {
+          kinds: [4],
+          authors: [NOSTR_ASSETS_PUBKEY],
+          "#p": [this.nostrPubKey],
+          since: Math.floor(Date.now() / 1000),
+        }
+      ]
+    )
+    subNostrTaprootAssets.on('event', async data => {
+      console.log(data);
+      let message;
+      if(window.nostr){
+
+        message = await window.nostr.nip04.decrypt(data.pubkey,data.content);
+        console.log(message);
+        const ordi = message.split('ORDI')[1].split("Balance:")[1].replace(/\D/g, '');
+        this.speed = 0.8 + Number(ordi)/1000
+        const meme = message.split('MEME')[1].split("Balance:")[1].replace(/\D/g, '');
+        const usdt = message.split('USDT')[1].split("Balance:")[1].replace(/\D/g, '');
+      }
+    });
+    this.relayNostrTaprootAssets = relayNostrTaprootAssets;
     // on the sender side
     let message = 'balance';
     let ciphertext;
@@ -768,13 +987,14 @@ class MainScene extends Scene3D {
     });
   }
   async addProfile(info, player) {
+    console.log(info)
     let content;
     try {
       content = JSON.parse(info.profile.content);
     } catch (err) {
       console.log(err);
     }
-    if (this.publickeys[info.profile.pubkey] && !player) return;
+    if (this.publickeys[info.profile.pubkey] && !this.player) return;
     this.publickeys[info.profile.pubkey] = true;
     let metadata;
     try {
@@ -1006,24 +1226,29 @@ class MainScene extends Scene3D {
           z: this.player.body.velocity.z
         }
       };
-      // Position
-      let event = {
-        kind: 29211,
-        pubkey: this.nostrPubKey,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [
-          ['t', 'nostr-space'],
-          ['nostr-space-movement',JSON.stringify(pos)]
-        ],
-        content: `Moved to position - (${this.player.body.position.x},${this.player.body.position.y},${this.player.body.position.z})`
+      if(!this.nostrPubKey) return;
+      if(this.conn){
+        this.conn.send({
+          type: "movement",
+          data: {
+            pubkey: this.nostrPubKey,
+            position: pos.position,
+            velocity: pos.velocity
+          }
+        });
+        return;
       }
-      event.id = getEventHash(event)
-      event = await this.signEvent(event);
-      let pubs = this.relay.publish(event)
-      pubs.on('ok', (res) => {
-        //this.moving = false;
-        //console.log(res);
-      });
+      this.connections.map(conn => {
+        conn.send({
+          type: "movement",
+          data: {
+            pubkey: this.nostrPubKey,
+            position: pos.position,
+            velocity: pos.velocity
+          }
+        });
+      })
+
 
     } catch(err){
       console.log(err)
@@ -1108,14 +1333,19 @@ class MainScene extends Scene3D {
       }
       if(this.keys.t.isDown && this.connected && !this.fetchingAssets){// && process.env.REACT_APP_TAP_REST && process.env.REACT_APP_TAP_MACAROON){
         //this.connectTapRootNode();
-        this.getNostrTaprootAssets();
+        //this.getNostrTaprootAssets();
+        if(!this.lnc?.isConnected){
+          this.connectLNC();
+        } else {
+          this.fetchAssetsLNC();
+        }
       }
       if(this.keys.o.isDown && !this.occuping && this.connected){
         this.occuping = true;
         this.occupy();
       }
 
-      if(!this.moving && this.connected){
+      if(!this.moving && this.connected && (this.conn || this.connections.length > 0)){
         this.moving = true;
         this.time.addEvent({
           delay: 600,
@@ -1125,6 +1355,7 @@ class MainScene extends Scene3D {
         })
         this.setPlayerPos();
       }
+
       if(this.keys.f.isDown && this.canShoot && this.connected){
         this.canShoot = false;
         this.time.addEvent({
@@ -1153,25 +1384,16 @@ class MainScene extends Scene3D {
   }
 }
 
-const config = {
-  type: Phaser.WEBGL,
-  transparent: true,
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: window.innerWidth * Math.max(1, window.devicePixelRatio / 2),
-    height: window.innerHeight * Math.max(1, window.devicePixelRatio / 2)
-  },
-  scene: [MainScene],
-  ...Canvas({ antialias: false })
-}
+
 
 
 
 const Game3D =  () => {
 
   const [init,setInit] = useState();
-
+  const [peer, setPeer] = useState(null);
+  const [peerId,setPeerId] = useState(null);
+  const [conn,setConn] = useState(null);
   const keyDownHandler = event => {
 
       if (event.key === 'i') {
@@ -1186,14 +1408,38 @@ const Game3D =  () => {
       }
   };
   useEffect(() => {
+    const peerInstance = new Peer();
+
+    peerInstance.on('open',(id) => {
+        setPeerId(id);
+        setPeer(peerInstance);
+    });
+
+    return () => {
+        peerInstance.destroy();
+    };
+}, []);
+  useEffect(() => {
     document.addEventListener('keydown', keyDownHandler);
   },[]);
   useEffect(() => {
-    if(!init){
+    if(!init && peer && peerId){
+      const config = {
+        type: Phaser.WEBGL,
+        transparent: true,
+        scale: {
+          mode: Phaser.Scale.FIT,
+          autoCenter: Phaser.Scale.CENTER_BOTH,
+          width: window.innerWidth * Math.max(1, window.devicePixelRatio / 2),
+          height: window.innerHeight * Math.max(1, window.devicePixelRatio / 2)
+        },
+        scene: new MainScene({peer: peer,peerId: peerId}),
+        ...Canvas({ antialias: false })
+      }
       enable3d(() => new Phaser.Game(config)).withPhysics('/lib/ammo');
       setInit(true)
     }
-  },[init])
+  },[init,peer,peerId])
 
   return(
     <>
@@ -1220,19 +1466,19 @@ const Game3D =  () => {
         <Tab title="Instructions" className='tab'>
         <Box pad="medium" className='TabArea Tab' direction="row" gap="large">
         <Box basis="1/2">
-          <Text><button class="o-btn">C</button>&nbsp; &nbsp; &nbsp;Connect Nostr</Text>
-          <Text><button class="o-btn">W</button>&nbsp; &nbsp; &nbsp;Move foward</Text>
-          <Text><button class="o-btn">S</button>&nbsp; &nbsp; &nbsp;Stop</Text>
-          <Text><button class="o-btn">F</button>&nbsp; &nbsp; &nbsp;Shoot</Text>
+          <Text><button className="o-btn">C</button>&nbsp; &nbsp; &nbsp;Connect Nostr</Text>
+          <Text><button className="o-btn">W</button>&nbsp; &nbsp; &nbsp;Move foward</Text>
+          <Text><button className="o-btn">S</button>&nbsp; &nbsp; &nbsp;Stop</Text>
+          <Text><button className="o-btn">F</button>&nbsp; &nbsp; &nbsp;Shoot</Text>
         </Box>
         <Box basis="1/2">
-          <Text><button class="o-btn">I</button>&nbsp; &nbsp; &nbsp;Show/Hide instructions</Text>
+          <Text><button className="o-btn">I</button>&nbsp; &nbsp; &nbsp;Show/Hide instructions</Text>
           {
             window.nostr &&
-            <Text><button class="o-btn">O</button>&nbsp; &nbsp; &nbsp;Occupy position</Text>
+            <Text><button className="o-btn">O</button>&nbsp; &nbsp; &nbsp;Occupy position</Text>
           }
-          <Text><button class="o-btn">K</button>&nbsp; &nbsp; &nbsp;Send SATs to devs</Text>
-          <Text><button class="o-btn">E</button>&nbsp; &nbsp; &nbsp;View profile</Text>
+          <Text><button className="o-btn">K</button>&nbsp; &nbsp; &nbsp;Send SATs to devs</Text>
+          <Text><button className="o-btn">E</button>&nbsp; &nbsp; &nbsp;View profile</Text>
           <Text>Mouse:  Move camera direction</Text>
 
         </Box>
