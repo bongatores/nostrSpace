@@ -1,3 +1,4 @@
+
 import {useEffect,useState} from  'react';
 import LNC from '@lightninglabs/lnc-web';
 import Peer from 'peerjs';
@@ -33,16 +34,20 @@ import {
   connectWallet,
   generateKeys,
   relays,
-  initRelay,
+  initRelay, // This might need adjustment if not directly creating Relay objects
   changeRelay,
   fetchTaprootAssets
 } from './utils';
+
 import {
   SimplePool,
   nip19,
+} from 'nostr-tools';
+import {
   getEventHash,
   signEvent,
-} from 'nostr-tools';
+  finalizeEvent // Import finalizeEvent for the new nostr-tools API
+} from 'nostr-tools/pure';
 
 import {stringToBytes} from 'convert-string';
 import logo from './img/empty_space.png';
@@ -58,7 +63,7 @@ function getRandomInt(max) {
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
-const pool = new SimplePool()
+const pool = new SimplePool({ enablePing: true, enableReconnect: true }) // Global SimplePool instance
 const NOSTR_ASSETS_PUBKEY = '6c0fde2a3b2e481e21bdf09b377e0c3e5391bf0353db06ab37c88945a8a77402';
 let imgUri;
 
@@ -92,7 +97,6 @@ class MainScene extends Scene3D {
     this.connections = [];
   }
   async sendEnteredGameMsg(){
-    //this.peer.on()
     let event = {
       kind: 42,
       pubkey: this.nostrPubKey,
@@ -104,9 +108,9 @@ class MainScene extends Scene3D {
       ],
       content: this.serverId === this.peerId ? `Just entered the space as the server!` : `Just entered the space at server ${this.serverId}!`
     }
-    event.id = getEventHash(event)
+    // Updated: Use this.signEvent which now handles finalizeEvent internally or calls window.nostr/nwc
     event = await this.signEvent(event);
-    let pubs = pool.publish(relays, event)
+    let pubs = pool.publish(relays, event) // Use the global pool for publishing
     pubs.on('ok', (res) => {
       console.log(res);
     });
@@ -114,12 +118,8 @@ class MainScene extends Scene3D {
   async connect() {
     let newNostrPubKey;
     let keys;
-    if(window.nostr){// || process.env.REACT_APP_NOSTR_SK){
+    if(window.nostr){
       keys = await connectWallet();
-      /*if(process.env.REACT_APP_NOSTR_SK){
-        this.sk = keys.sk;
-      }
-      */
     } else {
       try{
         keys = await connectWallet();
@@ -131,7 +131,7 @@ class MainScene extends Scene3D {
       }
     }
     newNostrPubKey = keys.pk
-    let newProfile = await pool.get(relays, {
+    let newProfile = await pool.get(relays, { // Use the global pool for fetching
       authors: [
         newNostrPubKey
       ],
@@ -265,21 +265,24 @@ class MainScene extends Scene3D {
 
 
     //this.third.physics.debug.enable()
-    let event = await pool.get(relays, {
+    let event = await pool.get(relays, { // Use the global pool for fetching
       kinds: [42],
       '#t':['nostr-space']
     })
-    if(event.pubkey !== this.nostrPubKey){
+    if(event && event.pubkey !== this.nostrPubKey){ // Added check for event being null
       const tagPeerId = event.tags.filter(tag => tag[0] === 'peerJsId')
       console.log(event)
       console.log(tagPeerId)
       this.serverId = tagPeerId[0][1]
+    } else if (!event) { // If no event, this instance becomes the server
+        this.serverId = this.peerId;
     }
     this.handlePeerEvents();
     await this.generatePlayer();
+
     this.setControls();
-    this.subscribeNostrEvents();
     this.loadSkybox();
+    this.subscribeNostrEvents();
 
   }
 
@@ -385,48 +388,45 @@ class MainScene extends Scene3D {
 
   }
   async subscribeNostrEvents(){
-    const relayOffChain = await initRelay(process.env.REACT_APP_RELAY_1 ? process.env.REACT_APP_RELAY_1 : 'wss://relay2.nostrchat.io'); // Default relay
-    this.relay = relayOffChain;
-    let subOffChain = relayOffChain.sub(
-      [
-        {
-          '#t': ['nostr-space'],
-          kinds: [30078]
-        },
-        {
-          kinds: [1],
-          limit: 1,
-          since: Math.floor(Date.now() / 1000),
+    // Consolidated subscriptions using the global SimplePool
+    const filters = [
+      {
+        '#t': ['nostr-space'],
+        kinds: [30078]
+      },
+      {
+        kinds: [1],
+        limit: 1, // Limiting this to 1 might make it miss events if you expect continuous ones
+        since: Math.floor(Date.now() / 1000) - 60, // Fetch events from the last minute for initialization
+      },
+      {
+        kinds: [0],
+        limit: 50,
+      },
+      {
+        kinds: [40,42],
+        limit: 10,
+      },
+      {
+        kinds: [7],
+        since: Math.floor(Date.now() / 1000) - 60,
+        limit: 1 // Limiting this to 1 might make it miss events if you expect continuous ones
+      }
+    ];
+
+    for(const filter of filters){
+      pool.subscribe(relays,filter,{
+          onevent: (event) => {
+            this.handleEventsEmited(event)
+          }
         }
-      ]
-    );
+      );
+    }
 
-    subOffChain.on('event', async data => {
-      this.handleEventsEmited(data);
-    });
-
-    const relayNostrChat = await initRelay(process.env.REACT_APP_RELAY_2 ? process.env.REACT_APP_RELAY_2 : 'wss://relay1.nostrchat.io') // to get more data
-    let subNostrChat = relayNostrChat.sub(
-      [
-        {
-          kinds: [0],
-          limit: 50,
-        },
-        {
-          kinds: [40,42],
-          limit: 10,
-        },
-        {
-          kinds: [7],
-          since: Math.floor(Date.now() / 1000),
-          limit: 1
-        }
-      ]
-    )
-    subNostrChat.on('event', async data => {
-      this.handleEventsEmited(data);
-    });
-
+    // If 'this.relay' is specifically used for `occupy` (publishing to a single relay)
+    // you might still want an explicit connection for that, or just use `pool.publish(relays, event)`
+    // For now, let's ensure it's a valid relay from the pool
+    this.relay = pool.ensureRelay(process.env.REACT_APP_RELAY_1 || 'wss://relay2.nostrchat.io');
   }
   async handleEventsEmited(data){
     // Kind 1: Short Text Notes
@@ -447,7 +447,7 @@ class MainScene extends Scene3D {
       subProfileData = this.profileData[data.pubkey];
     } else if((data.kind === 30078 || data.kind === 29211)){
       // Get profile from multiple relays: cant be sure if the connected relay has the profile
-      subProfileData = await pool.get(relays, {
+      subProfileData = await pool.get(relays, { // Use the global pool for fetching
        authors: [
          data.pubkey
        ],
@@ -586,7 +586,7 @@ class MainScene extends Scene3D {
   }
   handlePeerEvents(){
     // Create a room
-    if(!this.serverId){
+    if(!this.serverId || this.serverId === this.peerId){ // If no serverId or this is the server
       this.handleHubConn();
     } else {
       this.handlePeerConn()
@@ -816,15 +816,25 @@ class MainScene extends Scene3D {
       }
     })
   }
+  // Updated signEvent function
   async signEvent(event){
+    // Ensure created_at and id are set before signing if not using finalizeEvent for browser/nwc
+    let finalEvent = { ...event }; // Create a copy to avoid modifying original 'event' object if passed by reference
+  
     if(this.sk){
-      event.sig = signEvent(event, this.sk);
+      // For direct private key signing, finalizeEvent calculates id and adds signature.
+      // It expects a raw event template and the Uint8Array secret key.
+      // Assuming this.sk is a hex string, convert it to Uint8Array.
+      const skUint8 = Buffer.from(this.sk, 'hex'); // Make sure Buffer is available
+      finalEvent = finalizeEvent(event, skUint8);
     } else if(window.nostr){
-      event = await window.nostr.signEvent(event)
+      // window.nostr.signEvent still takes the raw event and signs it
+      finalEvent = await window.nostr.signEvent(event);
     } else if(this.nwc){
-      event = this.nwc.signEvent(event);
+      // NWC signEvent also takes the raw event and signs it
+      finalEvent = await this.nwc.signEvent(event);
     }
-    return(event);
+    return finalEvent;
   }
   async shoot(){
     const raycaster = new THREE.Raycaster()
@@ -936,7 +946,8 @@ class MainScene extends Scene3D {
   }
   async getNostrTaprootAssets() {
 
-    const relayNostrTaprootAssets = await initRelay(process.env.REACT_APP_RELAY_3 ? process.env.REACT_APP_RELAY_3 : 'wss://relay.nostrassets.com') // to get more data
+    // Using pool.subscribe with the specific relay for this interaction
+    const relayNostrTaprootAssets = pool.ensureRelay(process.env.REACT_APP_RELAY_3 || 'wss://relay.nostrassets.com');
     let subNostrTaprootAssets = relayNostrTaprootAssets.sub(
       [
         {
@@ -946,7 +957,7 @@ class MainScene extends Scene3D {
           since: Math.floor(Date.now() / 1000),
         }
       ]
-    )
+    );
     subNostrTaprootAssets.on('event', async data => {
       console.log(data);
       let message;
@@ -978,13 +989,10 @@ class MainScene extends Scene3D {
       ],
       content: ciphertext
     }
-    event.id = getEventHash(event)
-
+    // Updated: Use this.signEvent
     event = await this.signEvent(event);
-    let pubs = this.relayNostrTaprootAssets.publish(event)
-    pubs.on('ok', (res) => {
-      console.log(res);
-    });
+    let pubs = this.relayNostrTaprootAssets.publish(event) // Publishing to a specific relay instance
+
   }
   async addProfile(info, player) {
     console.log(info)
@@ -1029,7 +1037,9 @@ class MainScene extends Scene3D {
         try {
           image = await loader.load(metadata.image.replace("nostr.build/i/","image.nostr.build/"));
         } catch (err) {
-          image = makeBlockie(info.profile.pubkey);
+          // If image loading fails, use makeBlockie as fallback
+          const blockieDataURL = makeBlockie(info.profile.pubkey);
+          image = await loader.load(blockieDataURL);
         }
       }
       let textureCube = this.textures[info.profile.pubkey];
@@ -1195,9 +1205,9 @@ class MainScene extends Scene3D {
         ],
         content: `Update to position - (${this.player.position.x},${this.player.position.y},${this.player.position.z})`
       }
-      event.id = getEventHash(event)
+      // Updated: Use this.signEvent
       event = await this.signEvent(event);
-      let pubs = this.relay.publish(event)
+      let pubs = this.relay.publish(event) // Publishing to this.relay (single instance)
       pubs.on('ok', (res) => {
         this.occuping = false;
         //console.log(res);
@@ -1331,9 +1341,7 @@ class MainScene extends Scene3D {
         this.connecting = true;
         this.connect();
       }
-      if(this.keys.t.isDown && this.connected && !this.fetchingAssets){// && process.env.REACT_APP_TAP_REST && process.env.REACT_APP_TAP_MACAROON){
-        //this.connectTapRootNode();
-        //this.getNostrTaprootAssets();
+      if(this.keys.t.isDown && this.connected && !this.fetchingAssets){
         if(!this.lnc?.isConnected){
           this.connectLNC();
         } else {
