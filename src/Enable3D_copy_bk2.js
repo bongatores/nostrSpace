@@ -4,6 +4,7 @@ import LNC from '@lightninglabs/lnc-web';
 import Peer from 'peerjs';
 import {Buffer} from 'buffer';
 import Phaser from 'phaser';
+
 import './enable3d.css';
 
 import {

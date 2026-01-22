@@ -1,11 +1,9 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import ReactDOM from 'react-dom/client';
 import './index.css';
-//import Game from './Phaser';
-import Game3D from './Enable3D';
+import App from './App';
 
 import reportWebVitals from './reportWebVitals';
-import { Grommet } from 'grommet';
 import {
   HashRouter as Router,
   Route,
@@ -13,18 +11,15 @@ import {
   Navigate
 } from 'react-router-dom';
 
-ReactDOM.render(
-  <Grommet>
-    <Router>
-      <Routes>
-        <Route path="/" element={<Game3D />} />
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <Router>
+    <Routes>
+      <Route path="/" element={<App />} />
 
 
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </Router>
-  </Grommet>,
-  document.getElementById('root')
+      <Route path="*" element={<Navigate to="/" />} />
+    </Routes>
+  </Router>
 );
 
 // If you want to start measuring performance in your app, pass a function
